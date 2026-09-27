@@ -40,7 +40,7 @@ Local data is kept in `.wrangler/`, which git ignores, so test games never end u
 
 ### Pop-up sounds
 
-Sound files go in [`public/sounds/`](public/sounds/): `pinball0.mp3` for each of the first four results in a combo, and `scratch4.mp3` as the jackpot on the fifth (see the README there; which file plays at each step is set at the top of `public/popups.js`). Missing files just stay silent. Browsers only play sound after the page has been clicked, so the big screen asks once. Add `/?popup-preview` to the big screen's address to loop a sample pop-up.
+Sound files are in [`public/sounds/`](public/sounds/): `pinball.mp3` for each of the first four results in a combo, `pinball.mp3` plus `choir.mp3` as the jackpot on the fifth, and the eagle sounds around eagle pop-ups (see the README there; which file plays when is set at the top of `public/popups.js`). Missing files just stay silent. Browsers only play sound after the page has been clicked, so the big screen asks once. Add `/?popup-preview` to the big screen's address to loop a sample pop-up.
 
 ## Setting up the course
 
@@ -84,12 +84,19 @@ Open the live address (`https://minigolf-leaderboard.<your-subdomain>.workers.de
 | `public/play.*` | The phone scorecard |
 | `public/scoring.js` | Rankings and score formatting shared by both pages |
 | `public/popups.js`, `sounds.js` | Pop-ups on the big screen and their sound effects |
+| `public/eagle.svg` | Placeholder cartoon eagle that flies across the screen for eagle pop-ups; swap for your own animation |
 | `public/vendor/qrcode.mjs` | QR code generator ([qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator)); refresh it with `npm run vendor` |
 | `course.json` | The course's pars and maximum strokes |
 
 ## Credits
 
 Animal pictures from [Animal Pack Remastered](https://kenney.nl/assets/animal-pack-remastered) by [Kenney](https://kenney.nl) (CC0).
+
+Sound effects (in [`public/sounds/`](public/sounds/)):
+
+- `pinball.mp3`: from ["Classic Pinball Gameplay"](https://freesound.org/s/404144/) by [theshaggyfreak](https://freesound.org/people/theshaggyfreak/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Trimmed and edited.
+- `eagle.mp3`, `eaglein.mp3`, `eagleout.mp3`: from ["RAM_Mouth Hawk_rev_v1.wav"](https://freesound.org/s/344445/) by [reidedo](https://freesound.org/people/reidedo/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Trimmed and edited; `eaglein` and `eagleout` are the two halves.
+- `choir.mp3`: from Freesound (CC0). Trimmed and edited.
 
 ## Still to come
 

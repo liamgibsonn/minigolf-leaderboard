@@ -131,20 +131,22 @@ async function showSoundHint() {
   addEventListener('keydown', unlock);
 }
 
-// A 5 combo (dun0 to dun4, the jackpot last), then once that's finished an 8 combo (the
-// same five sounds, then silence for the last three animals). Both mix two parties.
+// A 5 combo (pinball x4, then the choir), an 8 combo (the same, then silence for the
+// last three animals), then a 2-eagle pop-up (eaglein, then the card with eagle, then
+// the animals with pinballs, then eagleout as it leaves).
 function previewPopups() {
-  const birdies = (party, animals) => ({
+  const results = (party, type, animals) => ({
     partyName: party,
-    events: animals.map((animal, i) => ({ name: `Player ${i + 1}`, animal, type: 'birdie' })),
+    events: animals.map((animal, i) => ({ name: `Player ${i + 1}`, animal, type })),
   });
   const play = () => {
-    popups.add(birdies('The Wobbly Putters', [21, 9, 22]));
-    popups.add(birdies('The Hole Hoppers', [18, 15]));
+    popups.add(results('The Wobbly Putters', 'birdie', [21, 9, 22]));
+    popups.add(results('The Hole Hoppers', 'birdie', [18, 15]));
     setTimeout(() => {
-      popups.add(birdies('The Wobbly Putters', [0, 3, 6, 10]));
-      popups.add(birdies('The Hole Hoppers', [13, 19, 23, 29]));
-    }, 8000);
+      popups.add(results('The Wobbly Putters', 'birdie', [0, 3, 6, 10]));
+      popups.add(results('The Hole Hoppers', 'birdie', [13, 19, 23, 29]));
+    }, 6000);
+    setTimeout(() => popups.add(results('The Hole Hoppers', 'eagle', [12, 26])), 12000);
   };
   play();
   setInterval(play, 20000);

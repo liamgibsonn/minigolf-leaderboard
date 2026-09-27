@@ -292,11 +292,13 @@ body {
 }
 
 .popup-animals { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.8vmin; }
+/* Each animal is visible from its very first frame (in time with its sound) and pops
+   from big down to size, rather than fading in. */
 .popup-animals .animal {
   width: 6vmin;
   height: 6vmin;
   object-fit: contain;
-  animation: popup-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  animation: animal-pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
 .popup-more { font-size: 3vmin; color: #fff; }
 .popup-combo {
@@ -310,6 +312,10 @@ body {
   from { opacity: 0; transform: rotate(3deg) scale(1.8); }
   to { opacity: 1; transform: rotate(-3deg); }
 }
+@keyframes animal-pop {
+  from { transform: scale(1.9); }
+  to { transform: none; }
+}
 @keyframes popup-pop {
   from { opacity: 0; transform: scale(2.2); }
   to { opacity: 1; transform: none; }
@@ -320,6 +326,25 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .popup, .popup.leaving, .popup-animals .animal, .popup-combo { animation: none; }
 }
+
+/* Flying pop-ups (eagles): the artwork flies along its path (moved by popups.js) while the
+   label, animals and party name stay still in the middle underneath, appearing as it
+   arrives and fading as it leaves. */
+.flight {
+  display: grid;
+  justify-items: center;
+  gap: 0.4vmin;
+  font-style: italic;
+  font-weight: 900;
+  text-transform: uppercase;
+  text-align: center;
+}
+.flight-art { width: 30vmin; height: auto; will-change: transform; filter: drop-shadow(0 1.2vmin 1.5vmin rgb(0 0 0 / 0.45)); }
+.flight-info { display: grid; justify-items: center; gap: 0.4vmin; opacity: 0; }
+.flight-info.shown { opacity: 1; animation: popup-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+.flight-info.leaving { animation: flight-info-fade 0.4s ease-in forwards; }
+@keyframes flight-info-fade { to { opacity: 0; } }
+.flight .popup-party { color: #fff; text-shadow: 0 0.3vmin 0 #000, 0 0 1vmin #000; }
 
 /* ---- Sound ---- */
 

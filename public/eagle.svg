@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 170">
+  <!-- Placeholder cartoon eagle (drawn for this project), flying left with slow wing flaps.
+       Swap this file for your own animation; animated WebP or SVG both work in its place. -->
+  <style>
+    .wing { transform-box: view-box; transform-origin: 118px 78px; animation: flap 1.4s ease-in-out infinite alternate; }
+    .wing.back { animation-delay: -0.12s; }
+    @keyframes flap { from { transform: rotate(-26deg); } to { transform: rotate(22deg); } }
+    @media (prefers-reduced-motion: reduce) { .wing { animation: none; } }
+  </style>
+
+  <!-- back wing, behind the body -->
+  <g class="wing back">
+    <path d="M118 78 C 100 40, 120 10, 160 6 C 150 22, 170 20, 164 34 C 176 34, 174 46, 162 50 C 170 56, 160 64, 148 66 Z"
+          fill="#5b3418" stroke="#2b1a0c" stroke-width="3" stroke-linejoin="round"/>
+  </g>
+
+  <!-- tail -->
+  <path d="M168 88 L 222 72 L 228 100 L 222 112 L 170 104 Z" fill="#f4f1ea" stroke="#2b1a0c" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M190 84 L 196 106 M 206 80 L 210 108" stroke="#cfc8b8" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- talons, tucked up -->
+  <path d="M120 104 l -6 16 m 6 -16 l 2 17 m -2 -17 l 9 14" stroke="#f2b320" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- body -->
+  <ellipse cx="128" cy="90" rx="52" ry="24" fill="#7a4a24" stroke="#2b1a0c" stroke-width="3"/>
+  <ellipse cx="120" cy="96" rx="30" ry="10" fill="#8f5a2e"/>
+
+  <!-- head and neck -->
+  <path d="M92 78 C 80 60, 60 52, 50 62 C 40 72, 50 92, 72 96 C 84 98, 94 92, 92 78 Z"
+        fill="#fbfaf6" stroke="#2b1a0c" stroke-width="3" stroke-linejoin="round"/>
+  <!-- hooked beak -->
+  <path d="M52 66 C 38 64, 26 70, 24 80 C 30 76, 36 76, 40 80 C 44 76, 50 76, 54 76 Z"
+        fill="#f2b320" stroke="#2b1a0c" stroke-width="3" stroke-linejoin="round"/>
+  <!-- eye and brow -->
+  <circle cx="62" cy="68" r="5" fill="#222"/>
+  <circle cx="60.5" cy="66.5" r="1.6" fill="#fff"/>
+  <path d="M54 60 L 72 63" stroke="#2b1a0c" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- front wing, over the body -->
+  <g class="wing front">
+    <path d="M118 78 C 96 36, 116 2, 170 0 C 158 18, 182 16, 176 32 C 190 32, 188 46, 174 50 C 184 58, 170 68, 154 68 C 150 76, 132 80, 118 78 Z"
+          fill="#8a5429" stroke="#2b1a0c" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M132 60 C 142 52, 152 44, 158 30 M 140 68 C 152 62, 162 56, 170 44" stroke="#5b3418" stroke-width="3" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>
