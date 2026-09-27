@@ -1,0 +1,130 @@
+/* Greyscale on purpose (a blank canvas to style later). The only colours are the
+   over/under-par scores, error messages and the gold/silver/bronze places. */
+:root {
+  --bg: #141414;
+  --panel: #262626;
+  --line: #3d3d3d;
+  --text: #f2f2f2;
+  --muted: #a3a3a3;
+  --accent: #f2f2f2;
+  --error: #ff8a80;
+  --under: #5ee08f;
+  --over: #ff8a80;
+  --gold: #f2c230;
+  --silver: #c7ccd4;
+  --bronze: #cd8a4f;
+  --on-medal: #1a1a1a;
+  --under-on-medal: #0b6b32;
+  --over-on-medal: #a3201a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px calc(24px + env(safe-area-inset-bottom));
+}
+
+h1 { font-size: 1.6rem; margin: 0 0 4px; }
+h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 24px 0 8px; }
+.sub { color: var(--muted); margin: 0 0 16px; }
+.message { color: var(--muted); text-align: center; margin-top: 30vh; }
+.error { color: var(--error); margin: 12px 0 0; }
+
+input {
+  width: 100%;
+  padding: 14px;
+  font: inherit;
+  font-size: 1.15rem;
+  color: var(--text);
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+}
+input:focus { outline: none; border-color: var(--accent); }
+input::placeholder { color: var(--muted); opacity: 0.6; }
+input[type='number'] { text-align: center; -moz-appearance: textfield; }
+input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+button { font: inherit; cursor: pointer; }
+button:disabled { opacity: 0.35; cursor: default; }
+
+.primary {
+  width: 100%;
+  margin-top: 24px;
+  padding: 16px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: 14px;
+}
+.link { background: none; border: 0; color: var(--accent); padding: 12px 0; }
+
+/* Setup */
+.stack { display: grid; gap: 8px; }
+
+/* Hole entry */
+.hole-head {
+  display: grid;
+  grid-template-columns: 48px 1fr 48px;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 16px;
+}
+.hole-head h1 { margin: 0; font-size: 1.45rem; white-space: nowrap; }
+.hole-head .sub { margin: 0; }
+.nav {
+  height: 48px;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--text);
+  background: var(--panel);
+  border: 0;
+  border-radius: 12px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.row .name { font-size: 1.15rem; font-weight: 600; overflow-wrap: anywhere; }
+
+/* Standings: each player is a bar, like on the big screen. */
+.standings { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
+.standings th { font-size: 0.8rem; font-weight: 400; color: var(--muted); text-align: right; padding: 0 12px 0 0; }
+.standings td { padding: 12px 12px 12px 0; text-align: right; background: var(--panel); font-variant-numeric: tabular-nums; }
+.standings td:first-child { padding-left: 12px; border-radius: 10px 0 0 10px; }
+.standings td:last-child { border-radius: 0 10px 10px 0; }
+.standings .pos { width: 2.4em; text-align: left; color: var(--muted); }
+.standings .name { text-align: left; font-weight: 600; overflow-wrap: anywhere; }
+.standings .num { width: 3.6em; }
+.standings .total { font-weight: 700; }
+.standings .under { color: var(--under); }
+.standings .over { color: var(--over); }
+/* Level par shows "0" in a mid grey (dark on the medal bars). */
+.standings .even { color: #6e6e6e; }
+
+/* 1st, 2nd and 3rd: the whole bar takes the medal colour. */
+.standings .place-1 td { background: var(--gold); }
+.standings .place-2 td { background: var(--silver); }
+.standings .place-3 td { background: var(--bronze); }
+.standings :is(.place-1, .place-2, .place-3) td { color: var(--on-medal); }
+.standings :is(.place-1, .place-2, .place-3) .under { color: var(--under-on-medal); }
+.standings :is(.place-1, .place-2, .place-3) .over { color: var(--over-on-medal); }
+.standings :is(.place-1, .place-2, .place-3) .even { color: var(--bg); }

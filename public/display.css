@@ -1,0 +1,209 @@
+/* Greyscale on purpose (a blank canvas to style later). The only colours are the
+   over/under-par scores and the gold/silver/bronze places. */
+:root {
+  --bg: #141414;
+  --panel: #262626;
+  --line: #3d3d3d;
+  --text: #f2f2f2;
+  --muted: #a3a3a3;
+  --accent: #f2f2f2;
+  --under: #5ee08f;
+  --over: #ff8a80;
+  --gold: #f2c230;
+  --silver: #c7ccd4;
+  --bronze: #cd8a4f;
+  --on-medal: #1a1a1a;       /* text on the gold/silver/bronze bars */
+  --under-on-medal: #0b6b32; /* darker green/red so they stay readable on the bars */
+  --over-on-medal: #a3201a;
+  --qr-size: 34vmin;   /* the white square around the QR code */
+  --qr-modules: 25;    /* set by display.js to the real QR size */
+  /* The gap between the QR code and the edge of the white: exactly 4 QR squares, the
+     "quiet zone" scanners need. The text in the strip uses the same gap. */
+  --gap: calc(var(--qr-size) * 4 / (var(--qr-modules) + 8));
+  --corner: calc(var(--qr-size) * 0.12); /* rounding on the white's top-left corners */
+  --fillet: 4vmin;     /* the inward curve where the strip meets the QR corner */
+  --cta-font: 3.7vmin;
+  --cta-pad-y: calc(var(--gap) * 0.5); /* less than --gap so the text fills the strip */
+  --strip-height: calc(2 * var(--cta-pad-y) + var(--cta-font) * 1.15); /* one line of text */
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+/* Landscape: player lines on the left, the QR corner below-right of them. The white
+   strip and QR corner are fixed to the screen edges, so the padding keeps the lines
+   clear of the strip. */
+body {
+  display: grid;
+  grid-template-areas:
+    'head head'
+    'board .';
+  grid-template-columns: 1fr var(--qr-size);
+  grid-template-rows: auto 1fr;
+  gap: 3vmin 4vmin;
+  padding: 4vmin;
+  padding-bottom: calc(var(--strip-height) + 3vmin);
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 3vmin;
+}
+
+/* Portrait: player lines use the full width and stop above the QR corner. */
+@media (orientation: portrait) {
+  body {
+    grid-template-areas:
+      'head'
+      'board';
+    grid-template-columns: 1fr;
+    padding-bottom: calc(var(--qr-size) + 3vmin);
+  }
+}
+
+.head {
+  grid-area: head;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.head h1 { margin: 0; font-size: 5vmin; font-weight: 800; letter-spacing: -0.02em; }
+.status { margin: 0; font-size: 3.2vmin; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* ---- Player lines ---- */
+
+/* Lines grow with the screen only up to a readable size, so a bigger screen fits more
+   rounds rather than the same rounds bigger. Everything in a line is sized from this. */
+:root { --line-font: clamp(20px, 3vmin, 32px); }
+
+.board {
+  grid-area: board;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--line-font) * 0.3);
+  min-height: 0;
+  overflow: hidden; /* display.js removes any line that doesn't fully fit */
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 2.2em 1fr auto 3.2em;
+  align-items: center;
+  gap: 0.8em;
+  padding: 0.35em 0.55em;
+  font-size: var(--line-font);
+  font-weight: 700;
+  background: var(--panel);
+  border-radius: 0.45em;
+  font-variant-numeric: tabular-nums;
+}
+.row .rank {
+  display: grid;
+  place-items: center;
+  width: 1.7em;
+  height: 1.7em;
+  font-size: 0.8em;
+  color: var(--muted);
+  border: 0.12em solid var(--line);
+  border-radius: 50%;
+}
+.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .total { font-size: 1.15em; font-weight: 800; }
+.row .to-par { text-align: right; color: var(--muted); }
+.row .to-par.under { color: var(--under); }
+.row .to-par.over { color: var(--over); }
+/* Level par shows "0" in a mid grey (dark on the medal bars). */
+.row .to-par.even { color: #6e6e6e; }
+
+/* 1st, 2nd and 3rd: the whole bar takes the medal colour. */
+.row.place-1 { background: var(--gold); }
+.row.place-2 { background: var(--silver); }
+.row.place-3 { background: var(--bronze); }
+.row:is(.place-1, .place-2, .place-3) { color: var(--on-medal); }
+.row:is(.place-1, .place-2, .place-3) .rank { color: var(--on-medal); border-color: rgb(0 0 0 / 0.35); }
+.row:is(.place-1, .place-2, .place-3) .to-par { color: rgb(0 0 0 / 0.6); }
+.row:is(.place-1, .place-2, .place-3) .to-par.under { color: var(--under-on-medal); }
+.row:is(.place-1, .place-2, .place-3) .to-par.over { color: var(--over-on-medal); }
+.row:is(.place-1, .place-2, .place-3) .to-par.even { color: var(--bg); }
+
+.empty {
+  margin: auto 0;
+  font-size: 7vmin;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--muted);
+}
+
+/* ---- White strip + QR corner ---- */
+
+/* The strip and the QR corner sit side by side in the bottom-right, flush with the
+   screen edges. Both use the same gap between their content and the edge of the white. */
+.cta {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Only as wide as the text, with its top-left corner rounded where the text begins. */
+.cta-text {
+  position: relative;
+  max-width: calc(100vw - var(--qr-size) - 4vmin); /* wraps rather than running off-screen */
+  margin: 0;
+  padding: var(--cta-pad-y) var(--gap);
+  font-size: var(--cta-font);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--bg);
+  background: #fff;
+  border-top-left-radius: var(--corner);
+}
+
+/* The inward curve joining the top of the strip to the QR corner's left side: a small
+   square that's white everywhere except a quarter circle cut out of its top-left. */
+.cta-text::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  width: var(--fillet);
+  height: var(--fillet);
+  background: radial-gradient(circle at 0 0, transparent calc(var(--fillet) - 0.5px), #fff var(--fillet));
+}
+
+/* The QR code sits the same distance from the bottom as from the right. The rounded
+   corner only cuts into the gap, never the code: at 12% radius the curve reaches ~4%
+   in, and the gap is ~10%. */
+.qr-corner {
+  flex: none;
+  width: var(--qr-size);
+  height: var(--qr-size);
+  padding: var(--gap);
+  background: #fff;
+  border-top-left-radius: var(--corner);
+}
+.qr-corner svg { display: block; width: 100%; height: 100%; }
+
+/* ---- Connection lost ---- */
+
+.offline-note {
+  position: fixed;
+  top: 2vmin;
+  left: 50%;
+  translate: -50% 0;
+  margin: 0;
+  padding: 0.6vmin 2vmin;
+  font-size: 2.2vmin;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 99px;
+  visibility: hidden;
+}
+body.offline .offline-note { visibility: visible; }

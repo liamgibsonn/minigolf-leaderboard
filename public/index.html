@@ -4,9 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minigolf Leaderboard</title>
+  <link rel="stylesheet" href="/display.css">
+  <script type="module" src="/display.js"></script>
 </head>
 <body>
-  <h1>Minigolf Leaderboard</h1>
-  <p>Display screen coming soon.</p>
+  <header class="head">
+    <h1>Minigolf</h1>
+    <p id="status" class="status"></p>
+  </header>
+  <ol id="board" class="board"></ol>
+  <footer class="cta">
+    <p class="cta-text">Want to play? Scan the QR Code to start a game!</p>
+    <div class="qr-corner" id="qr"></div>
+  </footer>
+  <p class="offline-note">Reconnecting…</p>
 </body>
 </html>

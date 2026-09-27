@@ -1,11 +1,4 @@
-import { DurableObject } from 'cloudflare:workers';
-
-// Holds all games, scores and the best-rounds list. Filled in as we build.
-export class Course extends DurableObject {
-  async fetch(request) {
-    return Response.json({ ok: true });
-  }
-}
+export { Course } from './course.js';
 
 export default {
   async fetch(request, env) {
