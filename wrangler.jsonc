@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "minigolf-leaderboard",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-25",
+
+  // Static pages (display + phone) are served straight from public/.
+  // Requests that don't match a file fall through to the Worker (API + WebSockets).
+  "assets": {
+    "directory": "./public"
+  },
+
+  // One Durable Object holds every game and the best-rounds list.
+  "durable_objects": {
+    "bindings": [{ "name": "COURSE", "class_name": "Course" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Course"] }]
+}

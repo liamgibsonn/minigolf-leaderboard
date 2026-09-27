@@ -1,0 +1,32 @@
+{
+  "name": "minigolf-leaderboard",
+  "version": "1.0.0",
+  "description": "Allows minigolf players to use digital scorecards which updates the local leaderboard live including pop ups for good and bad scores.",
+  "scripts": {
+    "vendor": "node -e \"require('fs').copyFileSync('node_modules/qrcode-generator/dist/qrcode.mjs','public/vendor/qrcode.mjs')\"",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liamgibsonn/minigolf-leaderboard.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/liamgibsonn/minigolf-leaderboard/issues"
+  },
+  "homepage": "https://github.com/liamgibsonn/minigolf-leaderboard#readme",
+  "devDependencies": {
+    "wrangler": "^4.141.0"
+  },
+  "allowScripts": {
+    "workerd@1.20260925.1": true,
+    "esbuild@0.28.1": true
+  },
+  "dependencies": {
+    "qrcode-generator": "^2.0.4"
+  }
+}
