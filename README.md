@@ -55,14 +55,16 @@ Restart the server after editing it. Games already in progress keep the course t
 
 ## Deploying
 
-The app runs on Cloudflare's free plan.
+The app runs on Cloudflare's free plan, and the GitHub repo is connected to the Worker, so **every push to `main` deploys automatically** (Cloudflare runs `npx wrangler deploy`). Build logs are under the Worker's **Deployments** tab in the Cloudflare dashboard.
+
+To deploy by hand instead:
 
 ```sh
 npx wrangler login
 npm run deploy
 ```
 
-Wrangler prints the address your app is live at (something like `https://minigolf-leaderboard.<you>.workers.dev`). Open that on the big screen, and the QR code will point phones to it.
+Open the live address (`https://minigolf-leaderboard.<your-subdomain>.workers.dev`) on the big screen, and the QR code will point phones to it. The live site has its own database, separate from the local one in `.wrangler/`.
 
 ## Project layout
 

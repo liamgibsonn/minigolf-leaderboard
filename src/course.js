@@ -412,10 +412,12 @@ export class Course extends DurableObject {
   }
 
   webSocketClose(ws, code) {
+    // Echo the close so the other side sees a clean disconnect. 1005 ("no code given")
+    // and 1006 can't be sent back, so answer those with a normal 1000.
     try {
-      ws.close(code, 'Closing');
+      ws.close(code === 1005 || code === 1006 ? 1000 : code, 'Closing');
     } catch {
-      // Already closed, or a reserved code (1005/1006) that can't be echoed back.
+      // Already closed.
     }
   }
 
