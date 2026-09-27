@@ -1,8 +1,9 @@
-// Big-screen records board: today's best rounds on the course, updated live. It isn't
-// tied to any one game; each group follows their own game on their phone.
+// Big-screen leaderboard: today's finished rounds on the course plus everyone still
+// playing, updated live. It isn't tied to any one game; each group follows their own
+// game on their phone.
 
 import qrcode from '/vendor/qrcode.mjs';
-import { formatToPar, toParClass, esc } from '/scoring.js';
+import { formatToPar, toParClass, sum, esc } from '/scoring.js';
 
 const board = document.getElementById('board');
 const status = document.getElementById('status');
@@ -45,32 +46,56 @@ async function refresh() {
 
 function render(data) {
   latest = data;
-  const { today, liveGames } = data;
-  status.textContent = liveGames
-    ? `Today · ${liveGames} ${liveGames === 1 ? 'game' : 'games'} being played`
-    : 'Today';
+  const { leaderboard, liveGames, layout } = data;
+  const parts = ['Today', `Par ${sum(layout)}`];
+  if (liveGames) parts.push(`${liveGames} ${liveGames === 1 ? 'game' : 'games'} being played`);
+  status.textContent = parts.join(' · ');
 
-  if (!today.best.length) {
+  if (!leaderboard.length) {
     board.innerHTML = '<li class="empty">No rounds yet today,<br>be the first!</li>';
     return;
   }
 
-  let rank = 0;
-  board.innerHTML = today.best
-    .map((round, i, all) => {
-      // Ties share a place (and a medal colour); the next place is skipped.
-      if (i === 0 || all[i - 1].total !== round.total) rank = i + 1;
-      const place = rank <= 3 ? ` place-${rank}` : '';
-      return `
-        <li class="row${place}">
-          <span class="rank">${rank}</span>
-          <span class="name">${esc(round.name)}</span>
-          <span class="total">${round.total}</span>
-          <span class="to-par ${toParClass(round.toPar)}">${formatToPar(round.toPar)}</span>
-        </li>`;
-    })
-    .join('');
+  // The podium is finished rounds only: everyone in 1st to 3rd place. Ties share a place
+  // and the next place is skipped, so it can hold more than three (e.g. two tied for
+  // bronze). Everyone else follows after a gap, finished and live together, in the
+  // server's order (by over/under par).
+  const finished = leaderboard.filter((round) => !round.live);
+  finished.forEach((round, i) => {
+    round.place = i > 0 && finished[i - 1].toPar === round.toPar ? finished[i - 1].place : i + 1;
+  });
+  const podium = finished.filter((round) => round.place <= 3);
+  const rest = leaderboard.filter((round) => !podium.includes(round));
+
+  // The number on each bar's tab is its place in the order shown. Bars next to each other
+  // with the same over/under par share a number.
+  [...podium, ...rest].forEach((round, i, all) => {
+    round.position = i > 0 && all[i - 1].toPar === round.toPar ? all[i - 1].position : i + 1;
+  });
+
+  board.innerHTML =
+    '<li class="labels" aria-hidden="true"><span></span><span>Holes</span><span>+/−</span></li>' +
+    podium.map((round) => row(round, layout.length)).join('') +
+    (podium.length && rest.length ? '<li class="podium-gap" aria-hidden="true"></li>' : '') +
+    rest.map((round) => row(round, layout.length)).join('');
   dropRowsThatDontFit();
+
+}
+
+// One bar: name, holes played (all of them for finished rounds), then over/under par so
+// far (green under, red over). Animals aren't shown here; they're kept for pop-ups.
+function row(round, holes) {
+  const place = round.place <= 3 ? ` place-${round.place}` : '';
+  return `
+    <li class="row${place}${round.live ? ' live' : ''}">
+      <span class="tab">
+        <span class="position">${round.position}</span>
+        ${round.live ? '<span class="live" aria-label="Live">L<br>I<br>V<br>E</span>' : ''}
+      </span>
+      <span class="name">${esc(round.name)}</span>
+      <span class="holes">${round.live ? round.thru : holes}</span>
+      <span class="score ${toParClass(round.toPar)}">${formatToPar(round.toPar)}</span>
+    </li>`;
 }
 
 // Show as many whole lines as the screen has room for.

@@ -71,28 +71,38 @@ button:disabled { opacity: 0.35; cursor: default; }
   border-radius: 14px;
 }
 .link { background: none; border: 0; color: var(--accent); padding: 12px 0; }
+.note { margin: 12px 0 0; font-size: 0.85rem; color: var(--muted); text-align: center; }
 
 /* Setup */
 .stack { display: grid; gap: 8px; }
 
 /* Hole entry */
-.hole-head {
-  display: grid;
-  grid-template-columns: 48px 1fr 48px;
-  align-items: center;
-  text-align: center;
-  margin-bottom: 16px;
-}
-.hole-head h1 { margin: 0; font-size: 1.45rem; white-space: nowrap; }
+.hole-head { text-align: center; margin-bottom: 16px; }
+.hole-head h1 { margin: 0; font-size: 1.45rem; }
 .hole-head .sub { margin: 0; }
-.nav {
-  height: 48px;
-  font-size: 1.8rem;
-  line-height: 1;
+
+/* "Welcome back": the game this phone was playing. */
+.resume { padding: 14px 16px; background: var(--panel); border-radius: 14px; }
+.resume p { margin: 0 0 4px; }
+.resume .sub { margin: 0; }
+.resume-party { font-size: 1.15rem; font-weight: 700; }
+
+/* Back on the left, the main button (Send / Next / Update / Hole 4 ›) on the right. */
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+  margin-top: 24px;
+}
+.actions .primary { margin-top: 0; }
+.secondary {
+  padding: 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
   color: var(--text);
   background: var(--panel);
   border: 0;
-  border-radius: 12px;
+  border-radius: 14px;
 }
 
 .row {
@@ -104,6 +114,17 @@ button:disabled { opacity: 0.35; cursor: default; }
   border-bottom: 1px solid var(--line);
 }
 .row .name { font-size: 1.15rem; font-weight: 600; overflow-wrap: anywhere; }
+.party { margin: 2px 0 0; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+
+/* Each player's animal, sitting just before their name. */
+.animal {
+  display: inline-block;
+  width: 1.7em;
+  height: 1.7em;
+  margin-right: 0.45em;
+  vertical-align: middle;
+  object-fit: contain;
+}
 
 /* Standings: each player is a bar, like on the big screen. */
 .standings { width: 100%; border-collapse: separate; border-spacing: 0 6px; }

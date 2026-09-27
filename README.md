@@ -4,8 +4,9 @@ Digital scorecards for minigolf. Players scan a QR code on the course's big scre
 
 ## How it works
 
-- **The big screen** shows today's best rounds on the course, how many games are being played right now, and a QR code to start a new game. It isn't tied to any one group, so any number of groups can play at once.
-- **Phones** are the scorecards. After scanning the QR code, one person enters the players' names, then fills in everyone's score for each hole and presses **Send**. Running totals are shown after every hole, and earlier holes can be corrected.
+- **The big screen** is today's leaderboard, ranked by over/under par. It shows finished rounds and players still out on the course (marked with a flashing LIVE tab), with a gold/silver/bronze podium that only finished rounds can reach. It also shows the course par, how many games are being played, and a QR code to start a new game. It isn't tied to any one group, so any number of groups can play at once.
+- **Phones** are the scorecards. After scanning the QR code, one person enters a party name (or gets a random one, like "The Wobbly Putters") and the players' names, then fills in everyone's score for each hole and presses **Send**. Running totals are shown after every hole, and earlier holes can be corrected.
+- **Animals**: every player is given a random animal, shown next to their name on the phone (and, later, in the big screen's pop-ups). Names containing swearing are refused.
 - **Records**: when a game is finished with every hole played, each player's round is saved. Records are kept separately for each course layout, and days start at 00:00 UTC.
 
 Built with plain HTML, CSS and JavaScript, running on [Cloudflare Workers](https://developers.cloudflare.com/workers/) with a [Durable Object](https://developers.cloudflare.com/durable-objects/) storing everything in SQLite.
@@ -70,11 +71,17 @@ Wrangler prints the address your app is live at (something like `https://minigol
 | `src/index.js` | Worker entry point: sends `/api/*` requests to the Durable Object |
 | `src/course.js` | The backend: games, scores, records and live updates (the API is described at the top) |
 | `src/stats.js` | Date and layout helpers for the records |
+| `src/names.js` | Swear filter ([obscenity](https://github.com/jo3-l/obscenity)), random animals and party names |
+| `public/animals/` | Animal pictures `0.png` to `29.png` |
 | `public/index.html`, `display.*` | The big screen |
 | `public/play.*` | The phone scorecard |
 | `public/scoring.js` | Rankings and score formatting shared by both pages |
 | `public/vendor/qrcode.mjs` | QR code generator ([qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator)); refresh it with `npm run vendor` |
 | `course.json` | The course's pars and maximum strokes |
+
+## Credits
+
+Animal pictures from [Animal Pack Remastered](https://kenney.nl/assets/animal-pack-remastered) by [Kenney](https://kenney.nl) (CC0).
 
 ## Still to come
 

@@ -28,6 +28,7 @@
     "esbuild@0.28.1": true
   },
   "dependencies": {
+    "obscenity": "^0.4.6",
     "qrcode-generator": "^2.0.4"
   }
 }

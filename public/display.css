@@ -1,8 +1,8 @@
 /* Greyscale on purpose (a blank canvas to style later). The only colours are the
-   over/under-par scores and the gold/silver/bronze places. */
+   over/under-par scores, the gold/silver/bronze places and the red LIVE tabs. */
 :root {
   --bg: #141414;
-  --panel: #262626;
+  --panel: #363636;
   --line: #3d3d3d;
   --text: #f2f2f2;
   --muted: #a3a3a3;
@@ -12,6 +12,7 @@
   --gold: #f2c230;
   --silver: #c7ccd4;
   --bronze: #cd8a4f;
+  --live: #e5484d;     /* the blinking LIVE tab */
   --on-medal: #1a1a1a;       /* text on the gold/silver/bronze bars */
   --under-on-medal: #0b6b32; /* darker green/red so they stay readable on the bars */
   --over-on-medal: #a3201a;
@@ -24,7 +25,8 @@
   --fillet: 4vmin;     /* the inward curve where the strip meets the QR corner */
   --cta-font: 3.7vmin;
   --cta-pad-y: calc(var(--gap) * 0.5); /* less than --gap so the text fills the strip */
-  --strip-height: calc(2 * var(--cta-pad-y) + var(--cta-font) * 1.15); /* one line of text */
+  --strip-lines: 1;    /* the strip's text wraps onto 2 lines in portrait */
+  --strip-height: calc(2 * var(--cta-pad-y) + var(--cta-font) * 1.15 * var(--strip-lines));
   color-scheme: dark;
 }
 
@@ -54,6 +56,7 @@ body {
 
 /* Portrait: player lines use the full width and stop above the QR corner. */
 @media (orientation: portrait) {
+  :root { --strip-lines: 2; }
   body {
     grid-template-areas:
       'head'
@@ -66,8 +69,10 @@ body {
 .head {
   grid-area: head;
   display: flex;
+  flex-wrap: wrap; /* the status goes under the title when there isn't room */
   align-items: baseline;
   justify-content: space-between;
+  gap: 1vmin 3vmin;
 }
 .head h1 { margin: 0; font-size: 5vmin; font-weight: 800; letter-spacing: -0.02em; }
 .status { margin: 0; font-size: 3.2vmin; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
@@ -90,46 +95,97 @@ body {
   list-style: none;
 }
 
-.row {
+/* The column labels share the bars' grid so they line up. */
+.row, .labels {
+  flex: none; /* never squash bars to fit; display.js drops the ones that don't */
   display: grid;
-  grid-template-columns: 2.2em 1fr auto 3.2em;
+  grid-template-columns: 1fr 3.4em 3.4em; /* name, holes, +/- */
   align-items: center;
   gap: 0.8em;
-  padding: 0.35em 0.55em;
+  padding: 0.35em 0.7em 0.35em 0.55em;
   font-size: var(--line-font);
   font-weight: 700;
+}
+.row {
   background: var(--panel);
   border-radius: 0.45em;
   font-variant-numeric: tabular-nums;
+  position: relative;
+  overflow: hidden; /* clips the tab to the bar's rounded corners */
 }
-.row .rank {
+
+/* Every bar has a darker tab down its left edge showing its place. On players still
+   playing, a red LIVE panel (reading L-I-V-E top to bottom) fades in over the place
+   number and back out again, so the number shows through in between. */
+:is(.row, .labels) { padding-left: calc(0.55em + 1.25em); }
+.tab {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1.25em;
   display: grid;
   place-items: center;
-  width: 1.7em;
-  height: 1.7em;
-  font-size: 0.8em;
-  color: var(--muted);
-  border: 0.12em solid var(--line);
-  border-radius: 50%;
+  background: rgb(0 0 0 / 0.35);
 }
-.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .total { font-size: 1.15em; font-weight: 800; }
-.row .to-par { text-align: right; color: var(--muted); }
-.row .to-par.under { color: var(--under); }
-.row .to-par.over { color: var(--over); }
-/* Level par shows "0" in a mid grey (dark on the medal bars). */
-.row .to-par.even { color: #6e6e6e; }
+/* The number is the bar's own colour, standing out against the darker tab. */
+.tab .position { font-size: 0.8em; font-weight: 800; color: var(--panel); }
+.row.place-1 .tab .position { color: var(--gold); }
+.row.place-2 .tab .position { color: var(--silver); }
+.row.place-3 .tab .position { color: var(--bronze); }
+.tab .live {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.5em; /* four lines just fit the bar's height */
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  color: #fff;
+  background: var(--live);
+  /* Fades out over 1s, back in over 1s, and repeats. */
+  animation: live-flash 1s ease-in-out infinite alternate;
+}
+@keyframes live-flash {
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tab .live { animation: none; }
+}
 
-/* 1st, 2nd and 3rd: the whole bar takes the medal colour. */
+.row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Small labels above the columns. */
+.labels { padding-block: 0; }
+.labels span {
+  font-size: 0.5em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: right;
+  color: var(--muted);
+}
+
+/* Holes played, then over/under par so far: green under, red over, grey level. */
+.row .holes { text-align: right; }
+.row .score { font-size: 1.15em; font-weight: 800; text-align: right; }
+.row .score.under { color: var(--under); }
+.row .score.over { color: var(--over); }
+.row .score.even { color: #6e6e6e; }
+
+/* The podium (1st to 3rd, finished rounds only): the whole bar takes the medal colour. */
 .row.place-1 { background: var(--gold); }
 .row.place-2 { background: var(--silver); }
 .row.place-3 { background: var(--bronze); }
 .row:is(.place-1, .place-2, .place-3) { color: var(--on-medal); }
-.row:is(.place-1, .place-2, .place-3) .rank { color: var(--on-medal); border-color: rgb(0 0 0 / 0.35); }
-.row:is(.place-1, .place-2, .place-3) .to-par { color: rgb(0 0 0 / 0.6); }
-.row:is(.place-1, .place-2, .place-3) .to-par.under { color: var(--under-on-medal); }
-.row:is(.place-1, .place-2, .place-3) .to-par.over { color: var(--over-on-medal); }
-.row:is(.place-1, .place-2, .place-3) .to-par.even { color: var(--bg); }
+.row:is(.place-1, .place-2, .place-3) .score.even { color: var(--bg); }
+.row:is(.place-1, .place-2, .place-3) .score.under { color: var(--under-on-medal); }
+.row:is(.place-1, .place-2, .place-3) .score.over { color: var(--over-on-medal); }
+
+/* Space between the podium and everyone else. */
+.podium-gap { flex: none; height: calc(var(--line-font) * 0.6); }
 
 .empty {
   margin: auto 0;

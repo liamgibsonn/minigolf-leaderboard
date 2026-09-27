@@ -1,15 +1,17 @@
 import { DurableObject } from 'cloudflare:workers';
 import courseJson from '../course.json';
 import { periodStarts, layoutKey, parseLayoutKey } from './stats.js';
+import { isRude, pickAnimals, randomPartyName } from './names.js';
 
 const MAX_HOLES = 18;
 const MAX_PLAYERS = 8;
 const MAX_NAME_LENGTH = 20;
+const MAX_PARTY_NAME_LENGTH = 30;
 const STROKE_LIMIT = 20; // the highest course.json can set maxStrokes to
 const BOARD_LIMIT = 50; // most rounds sent to the display; it shows as many as fit
-// A game still 'playing' with nothing sent for this long counts as abandoned, so it
-// doesn't inflate the "games being played" count forever.
-const LIVE_WINDOW = 3 * 60 * 60 * 1000;
+// A game still 'playing' with nothing sent for this long counts as abandoned: it drops
+// off the big screen (its data is kept, so it comes back if they carry on).
+const LIVE_WINDOW = 30 * 60 * 1000;
 
 // The course (par for each hole, which also sets the number of holes, and the most
 // strokes allowed on a hole) comes from course.json. Restart the server after editing it.
@@ -27,26 +29,32 @@ class HttpError extends Error {
 // API (all JSON, all under /api):
 //   POST /games                 -> { id, key }         create a game in 'setup'
 //   GET  /games/:id             -> { game }            read a game (no key needed)
-//   POST /games/:id/start       { key, players: [name] } -> { game }
+//   POST /games/:id/start       { key, partyName?, players: [name] } -> { game }
 //   POST /games/:id/hole        { key, hole, scores: [{ playerId, strokes }] } -> { game, submitted }
 //   POST /games/:id/finish      { key } -> { game }
 //   GET  /ws                    WebSocket for the display (the course records board)
 //   GET  /ws?game=:id           WebSocket for one game (phones)
-//   GET  /board                 -> { layout, today, liveGames }   what the display shows
+//   GET  /board                 -> { layout, today, liveGames, leaderboard }   what the display shows
 //   GET  /stats?layout=3-3-3&limit=5  -> { layout, periods }   records and averages
 //
 // Each game copies the course (see COURSE) when it's created, so changing course.json
 // never affects a game that's already underway.
 //
-// Phone sockets receive { type: 'game', game, submitted } whenever their game changes.
-// `submitted` is { hole, events } after a hole is sent, otherwise null. `events` are the
-// pop-ups to play, one per notable score (see scoreEvent). They only happen the first
-// time a hole is sent; resending it later (a correction) updates the scores quietly,
-// and resending identical scores does nothing at all.
+// Starting a game: names containing swearing are refused (see isRude). A blank party
+// name gets a random one, and each player is given a different random animal, a number
+// from 0 to 29 matching public/animals/<number>.png.
 //
-// The display is the course's records board, not a view of any one game. Its socket
-// receives { type: 'board', board } on connect and whenever a game starts or finishes,
-// and { type: 'events', gameId, hole, events } when a hole in any game earns pop-ups.
+// Phone sockets receive { type: 'game', game, submitted } whenever their game changes.
+// `submitted` is { hole, partyName, events } after a hole is sent, otherwise null.
+// `events` are the pop-ups to play, one per notable score (see scoreEvent), each with
+// the player's name and animal. They only happen the first time a hole is sent;
+// resending it later (a correction) updates the scores quietly, and resending identical
+// scores does nothing at all.
+//
+// The display is the course's leaderboard, not a view of any one game: today's finished
+// rounds plus everyone still playing. Its socket receives { type: 'board', board } on
+// connect and after every start, hole and finish, and { type: 'events', gameId, hole,
+// partyName, events } when a hole in any game earns pop-ups.
 //
 // Records: when a game is finished with every hole sent, each player's round is saved to
 // `rounds`. Stats are per course layout (the list of pars) for today, this week (from
@@ -64,13 +72,15 @@ export class Course extends DurableObject {
         max_strokes INTEGER NOT NULL,
         created_at  INTEGER NOT NULL,
         started_at  INTEGER,
-        finished_at INTEGER
+        finished_at INTEGER,
+        party_name  TEXT
       );
       CREATE TABLE IF NOT EXISTS players (
         id       INTEGER PRIMARY KEY,
         game_id  TEXT NOT NULL,
         name     TEXT NOT NULL,
-        position INTEGER NOT NULL
+        position INTEGER NOT NULL,
+        animal   INTEGER
       );
       CREATE TABLE IF NOT EXISTS scores (
         game_id   TEXT NOT NULL,
@@ -92,28 +102,28 @@ export class Course extends DurableObject {
         layout      TEXT NOT NULL,
         total       INTEGER NOT NULL,
         to_par      INTEGER NOT NULL,
-        finished_at INTEGER NOT NULL
+        finished_at INTEGER NOT NULL,
+        animal      INTEGER,
+        party_name  TEXT
       );
       CREATE INDEX IF NOT EXISTS players_by_game ON players (game_id);
       CREATE INDEX IF NOT EXISTS scores_by_game ON scores (game_id);
       CREATE INDEX IF NOT EXISTS rounds_by_layout_time ON rounds (layout, finished_at);
       CREATE INDEX IF NOT EXISTS rounds_by_layout_total ON rounds (layout, total);
     `);
-    this.backfillRounds();
+    // Databases made before parties and animals existed don't have these columns yet.
+    // Games and rounds from then just have no party name or animal (null).
+    this.addColumnIfMissing('games', 'party_name', 'TEXT');
+    this.addColumnIfMissing('players', 'animal', 'INTEGER');
+    this.addColumnIfMissing('rounds', 'animal', 'INTEGER');
+    this.addColumnIfMissing('rounds', 'party_name', 'TEXT');
+    // Rounds from before animals existed were test games; keep them off the board.
+    this.sql.exec('DELETE FROM rounds WHERE animal IS NULL');
   }
 
-  // Games finished before records existed never had their rounds saved. Save them now
-  // (only complete games, same as finishGame). Does nothing once they're all in.
-  backfillRounds() {
-    const missing = this.sql
-      .exec(
-        `SELECT id FROM games g
-         WHERE status = 'finished'
-           AND NOT EXISTS (SELECT 1 FROM rounds r WHERE r.game_id = g.id)
-           AND (SELECT COUNT(*) FROM holes_submitted h WHERE h.game_id = g.id) = json_array_length(g.pars)`,
-      )
-      .toArray();
-    for (const { id } of missing) this.saveRounds(this.loadGame(id));
+  addColumnIfMissing(table, column, type) {
+    const exists = this.sql.exec(`SELECT 1 FROM pragma_table_info('${table}') WHERE name = ?`, column).toArray().length;
+    if (!exists) this.sql.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
   }
 
   async fetch(request) {
@@ -172,13 +182,11 @@ export class Course extends DurableObject {
     }
     const updated = this.broadcast(id, submitted);
 
-    // The display: a start or finish changes the board (games being played, new rounds);
-    // a hole with pop-ups gets played on the big screen whichever game it came from.
-    if (action === 'start' || action === 'finish') {
-      this.sendToDisplays({ type: 'board', board: this.board() });
-    } else if (submitted.events.length) {
-      this.sendToDisplays({ type: 'events', gameId: id, hole: submitted.hole, events: submitted.events });
-    }
+    // The display: a hole with pop-ups gets played on the big screen whichever game it
+    // came from, and every change moves the leaderboard (live scores, new rounds, the
+    // games-being-played count).
+    if (submitted?.events.length) this.sendToDisplays({ type: 'events', gameId: id, ...submitted });
+    this.sendToDisplays({ type: 'board', board: this.board() });
     return Response.json({ game: updated, submitted });
   }
 
@@ -195,26 +203,39 @@ export class Course extends DurableObject {
     return { id, key };
   }
 
-  startGame(game, { players }) {
+  startGame(game, { partyName, players }) {
     if (game.status !== 'setup') throw new HttpError(409, 'This game has already started');
 
-    const names = (Array.isArray(players) ? players : [])
-      .map((name) => String(name ?? '').trim().slice(0, MAX_NAME_LENGTH))
-      .filter(Boolean);
+    const party = cleanName(partyName, MAX_PARTY_NAME_LENGTH);
+    if (party && isRude(party)) throw new HttpError(400, 'Please choose a different party name');
+
+    // Blank names are dropped (empty rows on the phone), but numbering for error
+    // messages follows what the player typed into.
+    const entered = (Array.isArray(players) ? players : []).map((name) => cleanName(name, MAX_NAME_LENGTH));
+    const rude = entered.findIndex((name) => name && isRude(name));
+    if (rude !== -1) throw new HttpError(400, `Please choose a different name for player ${rude + 1}`);
+    const names = entered.filter(Boolean);
     if (names.length < 1 || names.length > MAX_PLAYERS) {
       throw new HttpError(400, `Add between 1 and ${MAX_PLAYERS} players`);
     }
 
+    const animals = pickAnimals(names.length);
     this.ctx.storage.transactionSync(() => {
       names.forEach((name, position) => {
-        this.sql.exec('INSERT INTO players (game_id, name, position) VALUES (?, ?, ?)', game.id, name, position);
+        this.sql.exec(
+          'INSERT INTO players (game_id, name, position, animal) VALUES (?, ?, ?, ?)',
+          game.id, name, position, animals[position],
+        );
       });
-      this.sql.exec("UPDATE games SET status = 'playing', started_at = ? WHERE id = ?", Date.now(), game.id);
+      this.sql.exec(
+        "UPDATE games SET status = 'playing', started_at = ?, party_name = ? WHERE id = ?",
+        Date.now(), party || randomPartyName(), game.id,
+      );
     });
   }
 
   // Saves every player's strokes for one hole. Every player needs a score.
-  // Returns { hole, events }, or null if exactly these scores were already saved.
+  // Returns { hole, partyName, events }, or null if exactly these scores were already saved.
   submitHole(game, { hole, scores }) {
     if (game.status !== 'playing') throw new HttpError(409, 'This game isn’t in play');
     if (!Number.isInteger(hole) || hole < 0 || hole >= game.pars.length) throw new HttpError(400, 'Unknown hole');
@@ -256,10 +277,10 @@ export class Course extends DurableObject {
       ? game.players.flatMap((p) => {
           const strokes = strokesByPlayer.get(p.id);
           const type = scoreEvent(strokes, par, game.maxStrokes);
-          return type ? [{ playerId: p.id, name: p.name, type, strokes, par }] : [];
+          return type ? [{ playerId: p.id, name: p.name, animal: p.animal, type, strokes, par }] : [];
         })
       : [];
-    return { hole, events };
+    return { hole, partyName: game.partyName, events };
   }
 
   // Only complete games (every hole sent) count towards the records.
@@ -280,29 +301,56 @@ export class Course extends DurableObject {
     for (const p of game.players) {
       const total = p.scores.reduce((a, b) => a + b, 0);
       this.sql.exec(
-        'INSERT INTO rounds (game_id, player_id, name, layout, total, to_par, finished_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        game.id, p.id, p.name, layoutKey(game.pars), total, total - coursePar, game.finishedAt,
+        `INSERT INTO rounds (game_id, player_id, name, animal, party_name, layout, total, to_par, finished_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        game.id, p.id, p.name, p.animal, game.partyName, layoutKey(game.pars), total, total - coursePar, game.finishedAt,
       );
     }
   }
 
-  // What the display shows: today's best rounds on the current course, and how many
-  // games are being played right now.
+  // What the display shows: the leaderboard (today's finished rounds plus everyone still
+  // playing on the current course), and how many games are being played right now.
   board() {
     const { layout, periods } = this.stats(new URLSearchParams({ limit: String(BOARD_LIMIT) }));
-    return { layout, today: periods.today, liveGames: this.liveGameCount() };
+    const liveIds = this.liveGameIds();
+
+    // Players part-way through, once their party has sent at least one hole.
+    const live = liveIds
+      .map((id) => this.loadGame(id))
+      .filter((game) => game.submittedHoles.length && layoutKey(game.pars) === layoutKey(layout))
+      .flatMap((game) => {
+        const parSoFar = sumOf(game.submittedHoles.map((h) => game.pars[h]));
+        return game.players.map((p) => {
+          const total = sumOf(game.submittedHoles.map((h) => p.scores[h]));
+          return {
+            name: p.name, animal: p.animal, partyName: game.partyName,
+            total, toPar: total - parSoFar, thru: game.submittedHoles.length, live: true,
+          };
+        });
+      });
+    const finished = periods.today.best.map((round) => ({ ...round, live: false }));
+
+    // Everyone is ranked by over/under par, which also compares fairly with a round
+    // that's still going. On a tie, finished rounds come first (the sort keeps their
+    // existing order).
+    const leaderboard = [...finished, ...live]
+      .sort((a, b) => a.toPar - b.toPar || a.live - b.live)
+      .slice(0, BOARD_LIMIT);
+
+    return { layout, today: periods.today, liveGames: liveIds.length, leaderboard };
   }
 
   // Games in play that have had a hole sent (or started) recently.
-  liveGameCount() {
+  liveGameIds() {
     return this.sql
       .exec(
-        `SELECT COUNT(*) AS n FROM games g
+        `SELECT id FROM games g
          WHERE status = 'playing'
            AND MAX(started_at, COALESCE((SELECT MAX(submitted_at) FROM holes_submitted h WHERE h.game_id = g.id), 0)) >= ?`,
         Date.now() - LIVE_WINDOW,
       )
-      .one().n;
+      .toArray()
+      .map((row) => row.id);
   }
 
   // Best rounds, averages and holes in one for each period, for one course layout
@@ -319,11 +367,11 @@ export class Course extends DurableObject {
       const { rounds, average } = this.sql
         .exec('SELECT COUNT(*) AS rounds, AVG(total) AS average FROM rounds WHERE layout = ? AND finished_at >= ?', layout, since)
         .one();
-      // Lowest total wins; on a tie, whoever got there first keeps the spot.
+      // Best over/under par wins; on a tie, whoever got there first keeps the spot.
       const best = this.sql
         .exec(
-          `SELECT name, total, to_par AS toPar, finished_at AS finishedAt FROM rounds
-           WHERE layout = ? AND finished_at >= ? ORDER BY total, finished_at LIMIT ?`,
+          `SELECT name, animal, party_name AS partyName, total, to_par AS toPar, finished_at AS finishedAt
+           FROM rounds WHERE layout = ? AND finished_at >= ? ORDER BY to_par, finished_at LIMIT ?`,
           layout, since, limit,
         )
         .toArray();
@@ -397,9 +445,9 @@ export class Course extends DurableObject {
 
     const pars = JSON.parse(row.pars);
     const players = this.sql
-      .exec('SELECT id, name FROM players WHERE game_id = ? ORDER BY position', id)
+      .exec('SELECT id, name, animal FROM players WHERE game_id = ? ORDER BY position', id)
       .toArray()
-      .map((p) => ({ id: p.id, name: p.name, scores: pars.map(() => null) }));
+      .map((p) => ({ id: p.id, name: p.name, animal: p.animal, scores: pars.map(() => null) }));
     const byId = new Map(players.map((p) => [p.id, p]));
     for (const s of this.sql.exec('SELECT player_id, hole, strokes FROM scores WHERE game_id = ?', id)) {
       byId.get(s.player_id).scores[s.hole] = s.strokes;
@@ -413,6 +461,7 @@ export class Course extends DurableObject {
       id: row.id,
       key: row.edit_key,
       status: row.status,
+      partyName: row.party_name,
       pars,
       maxStrokes: row.max_strokes,
       createdAt: row.created_at,
@@ -446,6 +495,11 @@ function scoreEvent(strokes, par, maxStrokes) {
   return null;
 }
 
+// Trims, squashes repeated spaces and cuts to length. Anything that isn't text becomes ''.
+function cleanName(value, maxLength) {
+  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength).trim() : '';
+}
+
 function send(sockets, message) {
   const text = JSON.stringify(message);
   for (const ws of sockets) {
@@ -458,6 +512,7 @@ function send(sockets, message) {
 }
 
 const roundTo1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
+const sumOf = (list) => list.reduce((a, b) => a + b, 0);
 
 // Reads the whole body. Returns null if there isn't one.
 async function readJson(request) {
