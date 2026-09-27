@@ -247,6 +247,98 @@ body {
 }
 .qr-corner svg { display: block; width: 100%; height: 100%; }
 
+/* ---- Pop-ups (Tony Hawk style) ---- */
+
+/* A compact card at the top middle of the screen, over the board without hiding it. The
+   type of score in big tilted letters, then an animal for each player who got it. */
+.popups {
+  position: fixed;
+  top: 2vmin;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.popups[hidden] { display: none; }
+
+.popup {
+  display: grid;
+  justify-items: center;
+  gap: 0.6vmin;
+  max-width: 60vw;
+  padding: 1.2vmin 3vmin 1.6vmin;
+  background: rgb(0 0 0 / 0.78);
+  border-radius: 2vmin;
+  box-shadow: 0 1vmin 3vmin rgb(0 0 0 / 0.5);
+  transform: rotate(-3deg);
+  font-style: italic;
+  font-weight: 900;
+  text-transform: uppercase;
+  text-align: center;
+  animation: popup-slam 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.popup.leaving { animation: popup-leave 0.4s ease-in forwards; }
+
+.popup-party { margin: 0; font-size: 1.8vmin; letter-spacing: 0.08em; color: #fff; }
+.popup-label { margin: 0; font-size: 5vmin; line-height: 1.05; color: #ffd23f; }
+.popup.bailed .popup-label { color: #ff4d4d; }
+/* Chunky black outline on the words, like the game. */
+.popup-label, .popup-combo {
+  -webkit-text-stroke: 0.08em #000;
+  paint-order: stroke fill;
+  text-shadow: 0 0.06em 0 #000;
+}
+
+.popup-animals { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.8vmin; }
+.popup-animals .animal {
+  width: 6vmin;
+  height: 6vmin;
+  object-fit: contain;
+  animation: popup-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.popup-more { font-size: 3vmin; color: #fff; }
+.popup-combo {
+  margin: 0;
+  font-size: 2.8vmin;
+  color: #5ee08f;
+  animation: popup-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+@keyframes popup-slam {
+  from { opacity: 0; transform: rotate(3deg) scale(1.8); }
+  to { opacity: 1; transform: rotate(-3deg); }
+}
+@keyframes popup-pop {
+  from { opacity: 0; transform: scale(2.2); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes popup-leave {
+  to { opacity: 0; transform: rotate(-3deg) translateY(-3vmin) scale(0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .popup, .popup.leaving, .popup-animals .animal, .popup-combo { animation: none; }
+}
+
+/* ---- Sound ---- */
+
+.sound-hint {
+  position: fixed;
+  top: 2vmin;
+  left: 2vmin;
+  z-index: 11;
+  padding: 0.8vmin 2vmin;
+  font: inherit;
+  font-size: 2.2vmin;
+  font-weight: 700;
+  color: var(--bg);
+  background: var(--accent);
+  border: 0;
+  border-radius: 99px;
+  cursor: pointer;
+}
+
 /* ---- Connection lost ---- */
 
 .offline-note {

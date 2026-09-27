@@ -488,12 +488,13 @@ function checkCourse({ pars, maxStrokes }) {
   return { pars, maxStrokes };
 }
 
-// Which pop-up (if any) a score earns. A hole in one beats everything else.
+// Which pop-up (if any) a score earns. A hole in one beats everything else; the only bad
+// score that pops up is hitting the maximum strokes.
 function scoreEvent(strokes, par, maxStrokes) {
   if (strokes === 1) return 'hole-in-one';
   if (strokes <= par - 2) return 'eagle';
   if (strokes === par - 1) return 'birdie';
-  if (strokes >= maxStrokes || strokes >= par + 3) return 'bailed';
+  if (strokes >= maxStrokes) return 'bailed';
   return null;
 }
 

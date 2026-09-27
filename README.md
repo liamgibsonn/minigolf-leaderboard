@@ -6,7 +6,8 @@ Digital scorecards for minigolf. Players scan a QR code on the course's big scre
 
 - **The big screen** is today's leaderboard, ranked by over/under par. It shows finished rounds and players still out on the course (marked with a flashing LIVE tab), with a gold/silver/bronze podium that only finished rounds can reach. It also shows the course par, how many games are being played, and a QR code to start a new game. It isn't tied to any one group, so any number of groups can play at once.
 - **Phones** are the scorecards. After scanning the QR code, one person enters a party name (or gets a random one, like "The Wobbly Putters") and the players' names, then fills in everyone's score for each hole and presses **Send**. Running totals are shown after every hole, and earlier holes can be corrected.
-- **Animals**: every player is given a random animal, shown next to their name on the phone (and, later, in the big screen's pop-ups). Names containing swearing are refused.
+- **Animals**: every player is given a random animal, shown next to their name on the phone and in the big screen's pop-ups. Names containing swearing are refused.
+- **Pop-ups**: holes in one, eagles, birdies and maxed-out holes from any game pop up on the big screen, Tony Hawk style. Each pop-up is one type of score with an animal for everyone who got it: results of the same type that arrive together (even from different parties) share a pop-up as a combo, and different types play one after another.
 - **Records**: when a game is finished with every hole played, each player's round is saved. Records are kept separately for each course layout, and days start at 00:00 UTC.
 
 Built with plain HTML, CSS and JavaScript, running on [Cloudflare Workers](https://developers.cloudflare.com/workers/) with a [Durable Object](https://developers.cloudflare.com/durable-objects/) storing everything in SQLite.
@@ -36,6 +37,10 @@ npm run dev:lan
 Open the big screen at `http://<your computer's IP>:8787` rather than `localhost`, because the QR code uses the address the screen was opened with. On Windows, `ipconfig` shows your IP under "IPv4 Address". If a firewall prompt appears, allow access on private networks.
 
 Local data is kept in `.wrangler/`, which git ignores, so test games never end up in a commit.
+
+### Pop-up sounds
+
+Sound files go in [`public/sounds/`](public/sounds/): `pinball0.mp3` for each of the first four results in a combo, and `scratch4.mp3` as the jackpot on the fifth (see the README there; which file plays at each step is set at the top of `public/popups.js`). Missing files just stay silent. Browsers only play sound after the page has been clicked, so the big screen asks once. Add `/?popup-preview` to the big screen's address to loop a sample pop-up.
 
 ## Setting up the course
 
@@ -78,6 +83,7 @@ Open the live address (`https://minigolf-leaderboard.<your-subdomain>.workers.de
 | `public/index.html`, `display.*` | The big screen |
 | `public/play.*` | The phone scorecard |
 | `public/scoring.js` | Rankings and score formatting shared by both pages |
+| `public/popups.js`, `sounds.js` | Pop-ups on the big screen and their sound effects |
 | `public/vendor/qrcode.mjs` | QR code generator ([qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator)); refresh it with `npm run vendor` |
 | `course.json` | The course's pars and maximum strokes |
 
@@ -87,6 +93,7 @@ Animal pictures from [Animal Pack Remastered](https://kenney.nl/assets/animal-pa
 
 ## Still to come
 
-- Tony Hawk–style pop-ups and sounds on the big screen for holes in one, birdies and bad holes (the backend already sends these events)
+- A cartoony grass background with see-through bars
+- A cinematic hole-in-one pop-up style (ball flying across the grass into the hole) for quieter venues, picked in settings
 - Records for the week, month, year and all time on the big screen (the backend already calculates them)
 - A settings page and admin login for managing the course

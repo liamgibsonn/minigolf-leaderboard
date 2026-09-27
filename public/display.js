@@ -4,13 +4,20 @@
 
 import qrcode from '/vendor/qrcode.mjs';
 import { formatToPar, toParClass, sum, esc } from '/scoring.js';
+import { createPopups, SOUND_NAMES } from '/popups.js';
+import { createSounds } from '/sounds.js';
 
 const board = document.getElementById('board');
 const status = document.getElementById('status');
 let latest = null;
+const sounds = createSounds(SOUND_NAMES);
+const popups = createPopups(document.getElementById('popups'), sounds);
 
 drawQr(document.getElementById('qr'), `${location.origin}/play`);
 connect();
+showSoundHint();
+// /?popup-preview loops a sample pop-up, for trying out the look and sounds.
+if (new URLSearchParams(location.search).has('popup-preview')) previewPopups();
 // The live socket covers games starting and finishing. This also catches midnight
 // (a new day's board) and abandoned games dropping out of the "being played" count.
 setInterval(refresh, 60_000);
@@ -26,7 +33,8 @@ function connect(retryDelay = 1000) {
   ws.onmessage = (e) => {
     const message = JSON.parse(e.data);
     if (message.type === 'board') render(message.board);
-    // message.type === 'events': pop-ups from any game on the course (not built yet).
+    // Good and bad holes from any game on the course.
+    if (message.type === 'events') popups.add(message);
   };
   // Keep trying forever (backing off up to 15s) so the screen recovers by itself.
   ws.onclose = () => {
@@ -104,6 +112,42 @@ function dropRowsThatDontFit() {
   for (const row of [...board.children]) {
     if (row.getBoundingClientRect().bottom > bottom + 0.5) row.remove();
   }
+}
+
+// Browsers keep a page silent until it's been clicked (or a key pressed), so if there are
+// sound files, ask once. The note goes away as soon as sound is on.
+async function showSoundHint() {
+  const hint = document.getElementById('sound-hint');
+  if (!(await sounds.ready) || !sounds.locked) return;
+  hint.hidden = false;
+  const unlock = async () => {
+    await sounds.unlock();
+    if (sounds.locked) return;
+    hint.hidden = true;
+    removeEventListener('pointerdown', unlock);
+    removeEventListener('keydown', unlock);
+  };
+  addEventListener('pointerdown', unlock);
+  addEventListener('keydown', unlock);
+}
+
+// A 5 combo (dun0 to dun4, the jackpot last), then once that's finished an 8 combo (the
+// same five sounds, then silence for the last three animals). Both mix two parties.
+function previewPopups() {
+  const birdies = (party, animals) => ({
+    partyName: party,
+    events: animals.map((animal, i) => ({ name: `Player ${i + 1}`, animal, type: 'birdie' })),
+  });
+  const play = () => {
+    popups.add(birdies('The Wobbly Putters', [21, 9, 22]));
+    popups.add(birdies('The Hole Hoppers', [18, 15]));
+    setTimeout(() => {
+      popups.add(birdies('The Wobbly Putters', [0, 3, 6, 10]));
+      popups.add(birdies('The Hole Hoppers', [13, 19, 23, 29]));
+    }, 8000);
+  };
+  play();
+  setInterval(play, 20000);
 }
 
 function drawQr(container, url) {

@@ -1,3 +1,6 @@
 node_modules/
 .wrangler/
 .dev.vars
+
+# Ableton's analysis files, made next to audio it opens
+*.asd
