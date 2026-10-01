@@ -1,5 +1,4 @@
-// Player and party names, and the animals players are given. Kept free of Cloudflare
-// imports so it can be tested with plain Node.
+// No Cloudflare imports, so this can be tested with plain Node.
 
 import { RegExpMatcher, englishDataset, englishRecommendedTransformers } from 'obscenity';
 
@@ -8,14 +7,12 @@ export const ANIMAL_COUNT = 30;
 
 const matcher = new RegExpMatcher({ ...englishDataset.build(), ...englishRecommendedTransformers });
 
-// True for swearing and slurs, including disguised spellings like "sh1t". Also checks the
-// text with spaces, dots and dashes removed, to catch "f u c k". That catches a few
-// innocent names too (e.g. "Shi Tzu"), which is fine: the player just picks another.
+// Also checked with spaces, dots and dashes removed, to catch "f u c k". That catches a few
+// innocent names (e.g. "Shi Tzu"), which is fine: the player just picks another.
 export function isRude(text) {
   return matcher.hasMatch(text) || matcher.hasMatch(text.replace(/[\s._\-*]+/g, ''));
 }
 
-// `count` different animal numbers, in random order.
 export function pickAnimals(count) {
   const animals = Array.from({ length: ANIMAL_COUNT }, (_, i) => i);
   for (let i = animals.length - 1; i > 0; i--) {
@@ -34,7 +31,6 @@ const NOUNS = [
   'Tees', 'Aces', 'Loopers', 'Duffers', 'Chippers', 'Hole Hoppers',
 ];
 
-// For parties that don't pick a name, e.g. "The Wobbly Putters".
 export function randomPartyName() {
   return `The ${ADJECTIVES[randomInt(ADJECTIVES.length)]} ${NOUNS[randomInt(NOUNS.length)]}`;
 }

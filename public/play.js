@@ -1,10 +1,6 @@
-// Phone scorecard: set up players, then enter each hole and press Send.
-// Views: (welcome back ->) setup -> hole -> summary -> hole -> ... -> summary -> finished.
-
 import { standings, formatToPar, toParClass, sum, animalImg, esc } from '/scoring.js';
 
 const MAX_PLAYERS = 8;
-// Games in progress are offered back for this long after they started.
 const RESUME_WINDOW = 12 * 60 * 60 * 1000;
 const SAVED_GAME = 'minigolf-current-game';
 const app = document.getElementById('app');
@@ -18,8 +14,6 @@ init();
 async function init() {
   try {
     if (!gameId) {
-      // Scanning the QR code again (e.g. after closing the tab) offers the game this
-      // phone was playing, if it's still going.
       const saved = await unfinishedGame();
       if (saved) return showWelcomeBack(saved);
       await createGame();
@@ -32,7 +26,7 @@ async function init() {
 
 async function createGame() {
   ({ id: gameId, key } = await api('/api/games', {}));
-  // Keep the key in the URL so a refresh (or a friend's copy of the link) can still score.
+  // The key stays in the URL so a refresh can still score.
   history.replaceState(null, '', `/play?g=${gameId}&k=${key}`);
 }
 
@@ -53,8 +47,7 @@ async function openGame() {
 
 // ---- Welcome back --------------------------------------------------------
 
-// The game this phone was last playing, remembered in the browser only (nothing is sent
-// anywhere). It can be missing, e.g. in private browsing, which just means no offer.
+// Browser-only, and can fail (e.g. private browsing), which just means no offer.
 function rememberGame() {
   try {
     localStorage.setItem(SAVED_GAME, JSON.stringify({ g: gameId, k: key }));
@@ -67,7 +60,6 @@ function forgetGame() {
   } catch {}
 }
 
-// The remembered game, if it's still being played. Otherwise forgets it.
 async function unfinishedGame() {
   let saved;
   try {
@@ -80,7 +72,7 @@ async function unfinishedGame() {
       return { ...saved, game: savedGame };
     }
   } catch {
-    // Gone, or no signal: just start a new game.
+    // Gone, or no signal: start a new game.
   }
   forgetGame();
   return null;
@@ -145,7 +137,7 @@ function showSetup() {
   });
 
   onSubmit(app.querySelector('#setup'), async (form) => {
-    // Blank boxes are sent too, so "player 2" in an error message matches the second box.
+    // Blanks are sent too, so "player 2" in an error matches the second box.
     const players = [...names.querySelectorAll('input')].map((i) => i.value);
     if (!players.some((name) => name.trim())) throw new Error('Add at least one player');
     ({ game } = await api(`/api/games/${gameId}/start`, { key, partyName: form.elements.party.value, players }));
@@ -189,8 +181,7 @@ function showHole(hole) {
 
   const form = app.querySelector('#hole');
   const primary = form.querySelector('.primary');
-  // On a hole that's already been sent: "Next" moves on without sending anything, and
-  // turns into "Update" as soon as a score is changed.
+  // On a sent hole, "Next" moves on without sending, and becomes "Update" once a score changes.
   const changed = () => game.players.some((p) => form.elements[`p${p.id}`].value !== String(p.scores[hole] ?? ''));
   if (sent) form.addEventListener('input', () => (primary.textContent = changed() ? 'Update' : 'Next'));
 
@@ -209,8 +200,7 @@ function showHole(hole) {
   if (!sent) app.querySelector('input').focus();
 }
 
-// "Next" on a hole that's already been sent: the following hole, up to the one the
-// group is on. Past that (every hole sent) it's the totals, ready to finish.
+// Next hole up to the one the group is on; past that, the totals.
 function moveOnFrom(hole) {
   const next = nextHole();
   if (hole + 1 < game.pars.length && (next === null || hole + 1 <= next)) showHole(hole + 1);
@@ -265,7 +255,6 @@ function showFinished() {
     <a class="primary" href="/play" style="display:block;text-align:center;text-decoration:none">New game</a>`;
 }
 
-// With `hole`, also shows each player's score on that hole.
 function standingsTable(hole) {
   const rows = standings(game);
   const holeCol = hole !== undefined;
@@ -289,7 +278,6 @@ function standingsTable(hole) {
 
 // ---- Game helpers --------------------------------------------------------
 
-// First hole that hasn't been sent yet, or null if they all have.
 function nextHole() {
   for (let h = 0; h < game.pars.length; h++) if (!game.submittedHoles.includes(h)) return h;
   return null;
@@ -297,7 +285,7 @@ function nextHole() {
 
 // ---- Plumbing ------------------------------------------------------------
 
-// GET without a body, POST (JSON) with one. Throws with the server's message on failure.
+// GET without a body, POST with one. Throws with the server's message.
 async function api(path, body) {
   let res;
   try {
@@ -314,10 +302,9 @@ async function api(path, body) {
   return data;
 }
 
-// Runs a form's submit handler, showing any error under the form and blocking double taps.
 function onSubmit(form, handler) {
   const inputs = [...form.querySelectorAll('input')];
-  // "Next" on the phone keyboard moves between boxes; on the last box it submits.
+  // The keyboard's "Next" moves between boxes; on the last one it submits.
   inputs.slice(0, -1).forEach((input, i) => {
     input.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;

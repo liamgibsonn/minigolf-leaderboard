@@ -1,10 +1,8 @@
-// Helpers for the records and averages. Kept free of Cloudflare imports so they can be
-// tested with plain Node.
+// No Cloudflare imports, so this can be tested with plain Node.
 
 const DAY = 24 * 60 * 60 * 1000;
 
-// When each stats period began, in ms. Everything is UTC (so no BST/GMT jumps), and
-// weeks start on Monday.
+// All UTC (so no BST/GMT jumps); weeks start on Monday.
 export function periodStarts(now = Date.now()) {
   const d = new Date(now);
   const year = d.getUTCFullYear();
@@ -20,7 +18,7 @@ export function periodStarts(now = Date.now()) {
   };
 }
 
-// Records are kept per course layout, so e.g. 3 holes at par 3 is "3-3-3".
+// e.g. 3 holes at par 3 is "3-3-3"
 export const layoutKey = (pars) => pars.join('-');
 
 export function parseLayoutKey(key) {

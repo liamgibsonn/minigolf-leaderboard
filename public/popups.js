@@ -1,69 +1,65 @@
-// Pop-ups on the big screen for good holes (and maxed-out ones), from any game on the course.
-//
-// Each pop-up is one type of score: e.g. "HOLE IN ONE!" with an animal for everyone who
-// got one, from any party. Results arriving close together, or while a pop-up is already
-// playing, are collected and grouped by type, so three holes in one from three parties
-// make one "×3 combo" pop-up. Different types play as separate pop-ups, best first, and
-// a busy course never builds a long queue (or a racket).
-//
-// Each style is a function (layer, sounds, type, results) that plays one pop-up and
-// resolves when it's done. Only the Tony Hawk-style "skate" one exists so far; in it,
-// eagles fly across the screen (see FLIGHTS) and everything else gets a card.
-
 import { animalImg, esc } from '/scoring.js';
+import { playFlag } from '/flag.js';
 
-const GATHER_MS = 600; // wait this long after a result so ones arriving together share a pop-up
-const MAX_ANIMALS = 8; // any more become "+3"
-const STEP_MS = 220; // time between animals popping in (one sound each)
-const INTRO_OVERLAP_MS = 200; // the card (and its sound) start this long before an intro sound ends
-const ANIMALS_AFTER_MS = 1250; // after a card with its own sound appears, before the animals start
-const HOLD_MS = 2000; // how long the finished pop-up stays up
-const LEAVE_SOUND_EARLY_MS = 650; // a `leave` sound starts this long before the card goes (cards only)
-const LEAVE_MS = 400; // fade-out (matches .popup.leaving in display.css)
-// Flying pop-ups (see FLIGHTS): the fast swoop in from the top right, braking hard to an
-// almost-standstill in the middle, and the swoop out to the top left, which starts from
-// nearly still and quickly speeds up.
-const SWOOP_IN_MS = 700;
-const SWOOP_OUT_MS = 1000;
-const HOVER_DRIFT = '1.5vw'; // how far it drifts either side of the middle while almost still
-const FLIGHT_HOLD_MS = 1600; // like HOLD_MS, but for flights: how long it stays after the last animal
+const GATHER_MS = 1000;
+const GAP_MS = 200;
 
-// Pop-ups play in this order when several types are waiting.
-const TYPES = ['hole-in-one', 'eagle', 'birdie', 'bailed'];
-const LABELS = { 'hole-in-one': 'Hole in one!', eagle: 'Eagle!', birdie: 'Birdie!', bailed: 'Bailed' };
-
-// The sound for each animal as a combo stacks up in a pop-up, one entry per step (a file
-// can repeat, and a list plays several at once). The 5th is the jackpot: a pinball plus
-// the choir. Anything after that is silent, so it only plays once. Maxed-out scores have
-// no sounds yet.
-const GOOD_STEPS = ['pinball', 'pinball', 'pinball', 'pinball', ['pinball', 'choir']];
-const BAILED_STEPS = [];
-
-// Extra sounds for a type of pop-up, on top of the steps above: `intro` plays first with
-// nothing on screen yet, `appear` as the card appears (the animals and their steps start
-// shortly after), and `leave` as it goes.
-const TYPE_SOUNDS = {
-  eagle: { intro: 'eaglein', appear: 'eagle', leave: 'eagleout' },
+const COMBO = {
+  step: 220,
+  maxAnimals: 5,
+  notFullCut: 1000,
+  perMissingCut: 200,
+  sounds: ['pinball', 'pinball', 'pinball', 'pinball', ['pinball', 'choir']],
 };
 
-// Types that fly across the screen instead of showing a card, with their artwork. Swap the
-// file for your own animation (an animated WebP or SVG works in its place).
-const FLIGHTS = {
-  eagle: '/eagle.svg',
+// In play order. All times are ms from the pop-up's start. See CODE_GUIDE.md.
+const POPUPS = {
+  'hole-in-one': {
+    label: 'Hole in one!',
+    countWord: 'combo',
+    flag: true,
+    sounds: [],
+    timing: { appear: 2920, animals: 3070, leave: 5670, gone: 6170 },
+  },
+  eagle: {
+    label: 'Eagle!',
+    countWord: 'combo',
+    art: '/eagle.svg',
+    drift: '2.7vmin',
+    keepLength: true,
+    sounds: [[0, 'eaglein'], [1600, 'eagle'], [5600, 'eagleout']],
+    timing: { appear: 1600, arrive: 2100, animals: 2600, leave: 5600, gone: 6600 },
+  },
+  birdie: {
+    label: 'Birdie!',
+    countWord: 'combo',
+    sounds: [],
+    timing: { appear: 0, animals: 0, leave: 2500, gone: 3000 },
+  },
+  bailed: {
+    label: 'Bailed.',
+    countWord: '',
+    sounds: [],
+    timing: { appear: 0, animals: 0, leave: 2500, gone: 3000 },
+  },
 };
+
+const TYPES = Object.keys(POPUPS);
 
 export const SOUND_NAMES = [
-  ...new Set([...GOOD_STEPS, ...BAILED_STEPS, ...Object.values(TYPE_SOUNDS).flatMap(Object.values)].flat()),
+  ...new Set([...COMBO.sounds, ...Object.values(POPUPS).flatMap((popup) => popup.sounds.map(([, name]) => name))].flat()),
 ];
 
-const STYLES = { skate };
-
-// `add` takes what the server sends: { partyName, events: [{ name, animal, type, ... }] }.
-export function createPopups(layer, sounds, style = 'skate') {
-  const play = STYLES[style] ?? skate;
+export function createPopups(layer, sounds) {
   loadAllAnimals();
   let waiting = [];
   let busy = false;
+
+  function take(type) {
+    const results = waiting.filter((result) => result.type === type);
+    waiting = waiting.filter((result) => result.type !== type);
+    return results;
+  }
 
   async function playWaiting() {
     const type = TYPES.find((t) => waiting.some((result) => result.type === t));
@@ -71,11 +67,11 @@ export function createPopups(layer, sounds, style = 'skate') {
       busy = false;
       return;
     }
-    const results = waiting.filter((result) => result.type === type);
-    waiting = waiting.filter((result) => result.type !== type);
+    const results = take(type);
     try {
-      await animalsReady(results.slice(0, MAX_ANIMALS));
-      await play(layer, sounds, type, results);
+      await animalsReady(results.slice(0, COMBO.maxAnimals));
+      await showPopup(layer, sounds, type, results, () => take(type));
+      await wait(GAP_MS);
     } finally {
       playWaiting(); // the next type, including anything that arrived meanwhile
     }
@@ -94,138 +90,116 @@ export function createPopups(layer, sounds, style = 'skate') {
   };
 }
 
-// ---- Tony Hawk style ---------------------------------------------------------
+// takeLate() returns results of this type that arrived after the pop-up started.
+async function showPopup(layer, sounds, type, results, takeLate) {
+  const { art, drift, timing: planned, ...settings } = POPUPS[type];
+  const start = performance.now();
+  const until = (ms) => wait(start + ms - performance.now());
+  const at = (ms, fn) => setTimeout(fn, start + ms - performance.now());
+  const partyNames = () => [...new Set(results.map((result) => result.partyName).filter(Boolean))].map(esc).join(' &amp; ');
+  const afterAnimals = (ms) => ms > planned.animals;
 
-async function skate(layer, sounds, type, results) {
-  if (FLIGHTS[type]) return flight(layer, sounds, type, results);
-  const parties = [...new Set(results.map((result) => result.partyName).filter(Boolean))];
-  const shown = results.slice(0, MAX_ANIMALS);
-  const extra = results.length - shown.length;
-  const files = type === 'bailed' ? BAILED_STEPS : GOOD_STEPS;
-  const extras = TYPE_SOUNDS[type] ?? {};
+  for (const [ms, name] of settings.sounds) if (!afterAnimals(ms)) at(ms, () => sounds.play(name));
+  const flag = settings.flag && playFlag();
+  await until(planned.appear);
 
-  if (extras.intro) {
-    sounds.play(extras.intro);
-    await wait(Math.max(0, sounds.duration(extras.intro) - INTRO_OVERLAP_MS));
-  }
-
-  layer.innerHTML = `
-    <div class="popup ${type}">
-      <p class="popup-party">${parties.map(esc).join(' &amp; ')}</p>
-      <p class="popup-label">${LABELS[type]}</p>
-      <div class="popup-animals"></div>
-    </div>`;
+  const party = `<p class="popup-party">${partyNames()}</p>`;
+  const label = `<p class="popup-label">${settings.label}</p>`;
+  const animalsBox = '<div class="popup-animals"></div>';
+  layer.innerHTML = art
+    ? `<div class="flight ${type}">
+        <img class="flight-art" src="${art}" alt="">
+        <div class="flight-info">${label}${animalsBox}${party}</div>
+      </div>`
+    : `<div class="popup ${type}">${party}${label}${animalsBox}</div>`;
   const popup = layer.firstElementChild;
+  const words = art ? popup.querySelector('.flight-info') : popup;
   const animals = popup.querySelector('.popup-animals');
+  const bird = popup.querySelector('.flight-art');
   layer.hidden = false;
-  if (extras.appear) {
-    sounds.play(extras.appear);
-    await wait(ANIMALS_AFTER_MS);
+  if (art) {
+    at(planned.arrive, () => words.classList.add('shown'));
+    swoopIn(bird, planned, drift);
   }
 
-  await stackAnimals(animals, sounds, shown, files);
-  if (extra) animals.insertAdjacentHTML('beforeend', `<span class="popup-more">+${extra}</span>`);
-  if (results.length > 1) {
-    const count = type === 'bailed' ? `×${results.length}` : `×${results.length} combo`;
-    popup.insertAdjacentHTML('beforeend', `<p class="popup-combo">${count}</p>`);
-  }
-
-  await wait(HOLD_MS - LEAVE_SOUND_EARLY_MS);
-  sounds.play(extras.leave);
-  await wait(LEAVE_SOUND_EARLY_MS);
-  popup.classList.add('leaving');
-  await wait(LEAVE_MS);
-  layer.hidden = true;
-  layer.innerHTML = '';
-}
-
-// A flying pop-up: the artwork swoops in fast from the top right as its `appear` sound
-// starts, brakes to an almost-standstill in the middle, then speeds back up and swoops out
-// to the top left with its `leave` sound. The label, animals and party name stay still in
-// the middle underneath: they appear as it arrives and fade as it leaves. The sounds and
-// timings are the same settings the card uses.
-async function flight(layer, sounds, type, results) {
-  const parties = [...new Set(results.map((result) => result.partyName).filter(Boolean))];
-  const shown = results.slice(0, MAX_ANIMALS);
+  await until(planned.animals);
+  results = [...results, ...takeLate()];
+  popup.querySelector('.popup-party').innerHTML = partyNames();
+  const shown = results.slice(0, COMBO.maxAnimals);
   const extra = results.length - shown.length;
-  const extras = TYPE_SOUNDS[type] ?? {};
 
-  if (extras.intro) {
-    sounds.play(extras.intro);
-    await wait(Math.max(0, sounds.duration(extras.intro) - INTRO_OVERLAP_MS));
-  }
+  // Times are set for a full combo; a smaller one brings everything after `animals` earlier.
+  const missing = COMBO.maxAnimals - shown.length;
+  const cut = missing && !settings.keepLength ? COMBO.notFullCut + missing * COMBO.perMissingCut : 0;
+  const shift = (ms) => Math.max(planned.animals, ms - cut);
+  const timing = { ...planned, leave: shift(planned.leave), gone: shift(planned.gone) };
+  for (const [ms, name] of settings.sounds) if (afterAnimals(ms)) at(shift(ms), () => sounds.play(name));
+  if (art) swoopOut(bird, timing, drift);
 
-  layer.innerHTML = `
-    <div class="flight ${type}">
-      <img class="flight-art" src="${FLIGHTS[type]}" alt="">
-      <div class="flight-info">
-        <p class="popup-label">${LABELS[type]}</p>
-        <div class="popup-animals"></div>
-        <p class="popup-party">${parties.map(esc).join(' &amp; ')}</p>
-      </div>
-    </div>`;
-  const bird = layer.querySelector('.flight-art');
-  const info = layer.querySelector('.flight-info');
-  const animals = info.querySelector('.popup-animals');
-  layer.hidden = false;
-  sounds.play(extras.appear);
-
-  // One path for the whole flight, timed so the swoop out starts exactly when the card
-  // would normally leave. The easing on each keyframe shapes the segment after it:
-  // in, braking hard; a slow drift; out, starting from almost still and speeding up.
-  const leaveAt = ANIMALS_AFTER_MS + shown.length * STEP_MS + FLIGHT_HOLD_MS;
-  const swoopInEnd = Math.min(SWOOP_IN_MS, leaveAt);
-  const total = leaveAt + SWOOP_OUT_MS;
-  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    bird.animate(
-      [
-        { offset: 0, transform: 'translate(52vw, -28vh) rotate(-20deg) scale(0.75)', easing: 'cubic-bezier(0.2, 0.55, 0.25, 1)' },
-        { offset: swoopInEnd / total, transform: `translate(${HOVER_DRIFT}, 0) rotate(-3deg) scale(1)`, easing: 'linear' },
-        { offset: leaveAt / total, transform: `translate(-${HOVER_DRIFT}, 0) rotate(0deg) scale(1)`, easing: 'cubic-bezier(0.45, 0, 0.85, 0.35)' },
-        { offset: 1, transform: 'translate(-65vw, -40vh) rotate(18deg) scale(0.7)' },
-      ],
-      { duration: total, fill: 'forwards' },
-    );
-  }
-  setTimeout(() => info.classList.add('shown'), swoopInEnd);
-
-  await wait(ANIMALS_AFTER_MS);
-  await stackAnimals(animals, sounds, shown, GOOD_STEPS);
-  if (extra) animals.insertAdjacentHTML('beforeend', `<span class="popup-more">+${extra}</span>`);
+  await stackAnimals(animals, sounds, shown, extra);
   if (results.length > 1) {
-    animals.insertAdjacentHTML('afterend', `<p class="popup-combo">×${results.length} combo</p>`);
+    const count = settings.countWord ? `×${results.length} ${settings.countWord}` : `×${results.length}`;
+    animals.insertAdjacentHTML('afterend', `<p class="popup-combo">${count}</p>`);
   }
 
-  // The leave sound plays right as it takes off (not early, like the card's).
-  await wait(FLIGHT_HOLD_MS);
-  sounds.play(extras.leave);
-  info.classList.add('leaving');
-  await wait(SWOOP_OUT_MS);
+  await until(timing.leave);
+  if (!art) popup.style.animationDuration = `${timing.gone - timing.leave}ms`; // overrides .popup.leaving in display.css
+  words.classList.add('leaving');
+  const flagDown = flag && flag.sink(timing.gone - timing.leave);
+  await until(timing.gone);
   layer.hidden = true;
   layer.innerHTML = '';
+  await flagDown;
 }
 
-// Pops each animal in with its sound, STEP_MS apart. The sounds keep that exact rhythm;
-// each animal appears when its sound is actually heard (see heardAfter), not when it
-// starts, since a sound file often builds up to its hit and speakers add a little delay.
-// Steps without a sound (past the last one) keep the previous animal's timing.
-async function stackAnimals(animals, sounds, shown, steps) {
+// The leave time isn't known until `animals`, so the flight is planned twice. Called at
+// `appear`: swoops in, then drifts towards the full-combo `leave`.
+function swoopIn(art, timing, driftBy) {
+  const arrive = timing.arrive - timing.appear;
+  const total = Math.max(1, timing.leave - timing.appear);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // The easing on each keyframe shapes the segment after it.
+  art.animate(
+    [
+      { offset: 0, transform: 'translate(92vmin, -28vmin) rotate(-20deg) scale(0.75)', easing: 'cubic-bezier(0.3, 1, 0.8, 1)' },
+      { offset: arrive / total, transform: `translate(${driftBy}, 0) rotate(-3deg) scale(1)`, easing: 'linear' },
+      { offset: 1, transform: `translate(-${driftBy}, 0) rotate(0deg) scale(1)` },
+    ],
+    { duration: total, fill: 'forwards' },
+  );
+}
+
+// Called at `animals` with the real leave time: carries on from wherever it is, drifts
+// until `leave`, then speeds off by `gone`.
+function swoopOut(art, timing, driftBy) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const total = Math.max(1, timing.gone - timing.animals);
+  art.animate(
+    [
+      { offset: 0, transform: getComputedStyle(art).transform, easing: 'linear' },
+      { offset: (timing.leave - timing.animals) / total, transform: `translate(-${driftBy}, 0) rotate(0deg) scale(1)`, easing: 'cubic-bezier(0.3, 0, 0.6, 0)' }, // the swoop in, reversed
+      { offset: 1, transform: 'translate(-115vmin, -40vmin) rotate(18deg) scale(0.7)' },
+    ],
+    { duration: total, fill: 'forwards' },
+  );
+}
+
+// Each animal appears when its sound is actually heard, not when it starts (see heardAfter).
+async function stackAnimals(animals, sounds, shown, extra) {
   let delay = 0;
   for (const [i, result] of shown.entries()) {
-    const names = [steps[i] ?? []].flat();
+    const names = [COMBO.sounds[i] ?? []].flat();
     names.forEach((name) => sounds.play(name));
-    // With several sounds at once, the animal lands on whichever is heard first.
     const heard = names.map((name) => sounds.heardAfter(name)).filter((ms) => ms != null);
-    if (heard.length) delay = Math.min(...heard);
-    setTimeout(() => animals.insertAdjacentHTML('beforeend', animalImg(result.animal)), delay);
-    await wait(STEP_MS);
+    delay = heard.length ? Math.min(...heard) : 0;
+    const more = extra && i === shown.length - 1 ? `<span class="popup-more">+${extra}</span>` : '';
+    setTimeout(() => animals.insertAdjacentHTML('beforeend', animalImg(result.animal) + more), delay);
+    await wait(COMBO.step);
   }
-  await wait(delay); // the last animal is in before anything else happens
+  await wait(delay);
 }
 
-// An animal whose picture hasn't loaded yet shows up late, after its sound. So all 30
-// (small) pictures load when the big screen opens, and each pop-up waits until its own
-// animals are ready before it starts (instant once they've loaded).
+// Preloaded so an animal never shows up after its sound.
 const ANIMAL_COUNT = 30;
 const animalPictures = [];
 

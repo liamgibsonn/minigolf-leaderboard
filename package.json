@@ -6,7 +6,9 @@
     "vendor": "node -e \"require('fs').copyFileSync('node_modules/qrcode-generator/dist/qrcode.mjs','public/vendor/qrcode.mjs')\"",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "dev:lan": "wrangler dev --ip 0.0.0.0"
+    "dev:lan": "wrangler dev --ip 0.0.0.0",
+    "dev:loadtest": "wrangler dev --persist-to .wrangler/loadtest",
+    "loadtest": "k6 run loadtest/parties.js"
   },
   "repository": {
     "type": "git",

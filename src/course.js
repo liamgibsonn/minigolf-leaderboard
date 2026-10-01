@@ -9,12 +9,9 @@ const MAX_NAME_LENGTH = 20;
 const MAX_PARTY_NAME_LENGTH = 30;
 const STROKE_LIMIT = 20; // the highest course.json can set maxStrokes to
 const BOARD_LIMIT = 50; // most rounds sent to the display; it shows as many as fit
-// A game still 'playing' with nothing sent for this long counts as abandoned: it drops
-// off the big screen (its data is kept, so it comes back if they carry on).
+// A game with nothing sent for this long drops off the big screen (its data is kept).
 const LIVE_WINDOW = 30 * 60 * 1000;
 
-// The course (par for each hole, which also sets the number of holes, and the most
-// strokes allowed on a hole) comes from course.json. Restart the server after editing it.
 const COURSE = checkCourse(courseJson);
 
 class HttpError extends Error {
@@ -24,41 +21,7 @@ class HttpError extends Error {
   }
 }
 
-// Holds every game, player and score. There's one instance ("main") for the whole app.
-//
-// API (all JSON, all under /api):
-//   POST /games                 -> { id, key }         create a game in 'setup'
-//   GET  /games/:id             -> { game }            read a game (no key needed)
-//   POST /games/:id/start       { key, partyName?, players: [name] } -> { game }
-//   POST /games/:id/hole        { key, hole, scores: [{ playerId, strokes }] } -> { game, submitted }
-//   POST /games/:id/finish      { key } -> { game }
-//   GET  /ws                    WebSocket for the display (the course records board)
-//   GET  /ws?game=:id           WebSocket for one game (phones)
-//   GET  /board                 -> { layout, today, liveGames, leaderboard }   what the display shows
-//   GET  /stats?layout=3-3-3&limit=5  -> { layout, periods }   records and averages
-//
-// Each game copies the course (see COURSE) when it's created, so changing course.json
-// never affects a game that's already underway.
-//
-// Starting a game: names containing swearing are refused (see isRude). A blank party
-// name gets a random one, and each player is given a different random animal, a number
-// from 0 to 29 matching public/animals/<number>.png.
-//
-// Phone sockets receive { type: 'game', game, submitted } whenever their game changes.
-// `submitted` is { hole, partyName, events } after a hole is sent, otherwise null.
-// `events` are the pop-ups to play, one per notable score (see scoreEvent), each with
-// the player's name and animal. They only happen the first time a hole is sent;
-// resending it later (a correction) updates the scores quietly, and resending identical
-// scores does nothing at all.
-//
-// The display is the course's leaderboard, not a view of any one game: today's finished
-// rounds plus everyone still playing. Its socket receives { type: 'board', board } on
-// connect and after every start, hole and finish, and { type: 'events', gameId, hole,
-// partyName, events } when a hole in any game earns pop-ups.
-//
-// Records: when a game is finished with every hole sent, each player's round is saved to
-// `rounds`. Stats are per course layout (the list of pars) for today, this week (from
-// Monday), this month, this year and all time, all starting at 00:00 UTC.
+// Holds every game, player and score; one instance ("main"). The API is in CODE_GUIDE.md.
 export class Course extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
@@ -111,8 +74,7 @@ export class Course extends DurableObject {
       CREATE INDEX IF NOT EXISTS rounds_by_layout_time ON rounds (layout, finished_at);
       CREATE INDEX IF NOT EXISTS rounds_by_layout_total ON rounds (layout, total);
     `);
-    // Databases made before parties and animals existed don't have these columns yet.
-    // Games and rounds from then just have no party name or animal (null).
+    // Databases from before parties and animals don't have these columns yet.
     this.addColumnIfMissing('games', 'party_name', 'TEXT');
     this.addColumnIfMissing('players', 'animal', 'INTEGER');
     this.addColumnIfMissing('rounds', 'animal', 'INTEGER');
@@ -138,9 +100,7 @@ export class Course extends DurableObject {
   async route(request) {
     const url = new URL(request.url);
     const [, , resource, id, action] = url.pathname.split('/'); // '', 'api', resource, ...
-    // Always read the body first, even when we won't need it: replying while it's still
-    // unread makes the runtime throw ("Can't read from request stream after response
-    // has been sent").
+    // Read the body even when unused: replying with it unread makes the runtime throw.
     const body = await readJson(request);
 
     if (resource === 'ws') return this.connect(request, url.searchParams.get('game'));
@@ -182,9 +142,6 @@ export class Course extends DurableObject {
     }
     const updated = this.broadcast(id, submitted);
 
-    // The display: a hole with pop-ups gets played on the big screen whichever game it
-    // came from, and every change moves the leaderboard (live scores, new rounds, the
-    // games-being-played count).
     if (submitted?.events.length) this.sendToDisplays({ type: 'events', gameId: id, ...submitted });
     this.sendToDisplays({ type: 'board', board: this.board() });
     return Response.json({ game: updated, submitted });
@@ -209,8 +166,7 @@ export class Course extends DurableObject {
     const party = cleanName(partyName, MAX_PARTY_NAME_LENGTH);
     if (party && isRude(party)) throw new HttpError(400, 'Please choose a different party name');
 
-    // Blank names are dropped (empty rows on the phone), but numbering for error
-    // messages follows what the player typed into.
+    // Blank names are dropped, but error numbering follows the boxes typed into.
     const entered = (Array.isArray(players) ? players : []).map((name) => cleanName(name, MAX_NAME_LENGTH));
     const rude = entered.findIndex((name) => name && isRude(name));
     if (rude !== -1) throw new HttpError(400, `Please choose a different name for player ${rude + 1}`);
@@ -234,8 +190,7 @@ export class Course extends DurableObject {
     });
   }
 
-  // Saves every player's strokes for one hole. Every player needs a score.
-  // Returns { hole, partyName, events }, or null if exactly these scores were already saved.
+  // Returns null if exactly these scores were already saved.
   submitHole(game, { hole, scores }) {
     if (game.status !== 'playing') throw new HttpError(409, 'This game isn’t in play');
     if (!Number.isInteger(hole) || hole < 0 || hole >= game.pars.length) throw new HttpError(400, 'Unknown hole');
@@ -271,7 +226,6 @@ export class Course extends DurableObject {
       }
     });
 
-    // Order follows the players' order; the display decides how to stack them.
     const par = game.pars[hole];
     const events = firstTime
       ? game.players.flatMap((p) => {
@@ -295,7 +249,7 @@ export class Course extends DurableObject {
 
   // ---- Records -------------------------------------------------------------
 
-  // One row per player in `rounds`, which is what every record and average reads from.
+  // Every record and average reads from `rounds`.
   saveRounds(game) {
     const coursePar = game.pars.reduce((a, b) => a + b, 0);
     for (const p of game.players) {
@@ -308,13 +262,10 @@ export class Course extends DurableObject {
     }
   }
 
-  // What the display shows: the leaderboard (today's finished rounds plus everyone still
-  // playing on the current course), and how many games are being played right now.
   board() {
     const { layout, periods } = this.stats(new URLSearchParams({ limit: String(BOARD_LIMIT) }));
     const liveIds = this.liveGameIds();
 
-    // Players part-way through, once their party has sent at least one hole.
     const live = liveIds
       .map((id) => this.loadGame(id))
       .filter((game) => game.submittedHoles.length && layoutKey(game.pars) === layoutKey(layout))
@@ -330,9 +281,7 @@ export class Course extends DurableObject {
       });
     const finished = periods.today.best.map((round) => ({ ...round, live: false }));
 
-    // Everyone is ranked by over/under par, which also compares fairly with a round
-    // that's still going. On a tie, finished rounds come first (the sort keeps their
-    // existing order).
+    // On a tie, finished rounds come first (sort is stable).
     const leaderboard = [...finished, ...live]
       .sort((a, b) => a.toPar - b.toPar || a.live - b.live)
       .slice(0, BOARD_LIMIT);
@@ -340,7 +289,6 @@ export class Course extends DurableObject {
     return { layout, today: periods.today, liveGames: liveIds.length, leaderboard };
   }
 
-  // Games in play that have had a hole sent (or started) recently.
   liveGameIds() {
     return this.sql
       .exec(
@@ -353,8 +301,7 @@ export class Course extends DurableObject {
       .map((row) => row.id);
   }
 
-  // Best rounds, averages and holes in one for each period, for one course layout
-  // (the current course unless ?layout= says otherwise).
+  // For the current course unless ?layout= says otherwise.
   stats(params) {
     const layoutParam = params.get('layout');
     const pars = layoutParam ? parseLayoutKey(layoutParam) : COURSE.pars;
@@ -421,7 +368,6 @@ export class Course extends DurableObject {
     }
   }
 
-  // Sends the latest state to the phones watching this game, and returns it.
   broadcast(gameId, submitted) {
     const game = publicGame(this.loadGame(gameId));
     send(this.ctx.getWebSockets(`game:${gameId}`), { type: 'game', game, submitted });
@@ -488,8 +434,6 @@ function checkCourse({ pars, maxStrokes }) {
   return { pars, maxStrokes };
 }
 
-// Which pop-up (if any) a score earns. A hole in one beats everything else; the only bad
-// score that pops up is hitting the maximum strokes.
 function scoreEvent(strokes, par, maxStrokes) {
   if (strokes === 1) return 'hole-in-one';
   if (strokes <= par - 2) return 'eagle';
@@ -498,7 +442,6 @@ function scoreEvent(strokes, par, maxStrokes) {
   return null;
 }
 
-// Trims, squashes repeated spaces and cuts to length. Anything that isn't text becomes ''.
 function cleanName(value, maxLength) {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ').slice(0, maxLength).trim() : '';
 }
@@ -517,7 +460,6 @@ function send(sockets, message) {
 const roundTo1 = (n) => (n == null ? null : Math.round(n * 10) / 10);
 const sumOf = (list) => list.reduce((a, b) => a + b, 0);
 
-// Reads the whole body. Returns null if there isn't one.
 async function readJson(request) {
   const text = request.body ? await request.text() : '';
   if (!text.trim()) return null;

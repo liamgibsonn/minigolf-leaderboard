@@ -1,7 +1,3 @@
-// Big-screen leaderboard: today's finished rounds on the course plus everyone still
-// playing, updated live. It isn't tied to any one game; each group follows their own
-// game on their phone.
-
 import qrcode from '/vendor/qrcode.mjs';
 import { formatToPar, toParClass, sum, esc } from '/scoring.js';
 import { createPopups, SOUND_NAMES } from '/popups.js';
@@ -16,12 +12,15 @@ const popups = createPopups(document.getElementById('popups'), sounds);
 drawQr(document.getElementById('qr'), `${location.origin}/play`);
 connect();
 showSoundHint();
-// /?popup-preview loops a sample pop-up, for trying out the look and sounds.
 if (new URLSearchParams(location.search).has('popup-preview')) previewPopups();
-// The live socket covers games starting and finishing. This also catches midnight
-// (a new day's board) and abandoned games dropping out of the "being played" count.
+// Catches midnight and abandoned games, which the socket doesn't announce.
 setInterval(refresh, 60_000);
-addEventListener('resize', () => latest && render(latest));
+addEventListener('resize', () => {
+  fitStrip();
+  if (latest) render(latest);
+});
+fitStrip();
+document.fonts.ready.then(fitStrip);
 
 function connect(retryDelay = 1000) {
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -33,10 +32,9 @@ function connect(retryDelay = 1000) {
   ws.onmessage = (e) => {
     const message = JSON.parse(e.data);
     if (message.type === 'board') render(message.board);
-    // Good and bad holes from any game on the course.
     if (message.type === 'events') popups.add(message);
   };
-  // Keep trying forever (backing off up to 15s) so the screen recovers by itself.
+  // Keep retrying (backing off to 15s) so the screen recovers by itself.
   ws.onclose = () => {
     document.body.classList.add('offline');
     setTimeout(() => connect(Math.min(retryDelay * 2, 15000)), retryDelay);
@@ -48,7 +46,7 @@ async function refresh() {
     const res = await fetch('/api/board');
     if (res.ok) render(await res.json());
   } catch {
-    // Offline: the socket's reconnect note is already showing.
+    // Offline: the reconnect note is already showing.
   }
 }
 
@@ -64,10 +62,7 @@ function render(data) {
     return;
   }
 
-  // The podium is finished rounds only: everyone in 1st to 3rd place. Ties share a place
-  // and the next place is skipped, so it can hold more than three (e.g. two tied for
-  // bronze). Everyone else follows after a gap, finished and live together, in the
-  // server's order (by over/under par).
+  // Podium: finished rounds placed 1st to 3rd. Ties share a place, so it can hold more than three.
   const finished = leaderboard.filter((round) => !round.live);
   finished.forEach((round, i) => {
     round.place = i > 0 && finished[i - 1].toPar === round.toPar ? finished[i - 1].place : i + 1;
@@ -75,8 +70,7 @@ function render(data) {
   const podium = finished.filter((round) => round.place <= 3);
   const rest = leaderboard.filter((round) => !podium.includes(round));
 
-  // The number on each bar's tab is its place in the order shown. Bars next to each other
-  // with the same over/under par share a number.
+  // Neighbouring bars with the same score share a tab number.
   [...podium, ...rest].forEach((round, i, all) => {
     round.position = i > 0 && all[i - 1].toPar === round.toPar ? all[i - 1].position : i + 1;
   });
@@ -87,11 +81,8 @@ function render(data) {
     (podium.length && rest.length ? '<li class="podium-gap" aria-hidden="true"></li>' : '') +
     rest.map((round) => row(round, layout.length)).join('');
   dropRowsThatDontFit();
-
 }
 
-// One bar: name, holes played (all of them for finished rounds), then over/under par so
-// far (green under, red over). Animals aren't shown here; they're kept for pop-ups.
 function row(round, holes) {
   const place = round.place <= 3 ? ` place-${round.place}` : '';
   return `
@@ -106,7 +97,6 @@ function row(round, holes) {
     </li>`;
 }
 
-// Show as many whole lines as the screen has room for.
 function dropRowsThatDontFit() {
   const bottom = board.getBoundingClientRect().bottom;
   for (const row of [...board.children]) {
@@ -114,8 +104,7 @@ function dropRowsThatDontFit() {
   }
 }
 
-// Browsers keep a page silent until it's been clicked (or a key pressed), so if there are
-// sound files, ask once. The note goes away as soon as sound is on.
+// Browsers stay silent until the page is clicked, so ask once.
 async function showSoundHint() {
   const hint = document.getElementById('sound-hint');
   if (!(await sounds.ready) || !sounds.locked) return;
@@ -131,33 +120,47 @@ async function showSoundHint() {
   addEventListener('keydown', unlock);
 }
 
-// A 5 combo (pinball x4, then the choir), an 8 combo (the same, then silence for the
-// last three animals), then a 2-eagle pop-up (eaglein, then the card with eagle, then
-// the animals with pinballs, then eagleout as it leaves).
 function previewPopups() {
   const results = (party, type, animals) => ({
     partyName: party,
     events: animals.map((animal, i) => ({ name: `Player ${i + 1}`, animal, type })),
   });
+  const animals = (count) => [4, 11, 17, 22, 2, 25, 8, 14, 29].slice(0, count);
+  // [ms after the loop starts, type, combo size], spaced so each finishes before the next.
+  const sequence = [
+    [0, 'birdie', 1],
+    [3000, 'birdie', 7],
+    [8000, 'eagle', 1],
+    [16500, 'eagle', 7],
+    [25000, 'hole-in-one', 1],
+    [31500, 'hole-in-one', 7],
+  ];
   const play = () => {
-    popups.add(results('The Wobbly Putters', 'birdie', [21, 9, 22]));
-    popups.add(results('The Hole Hoppers', 'birdie', [18, 15]));
-    setTimeout(() => {
-      popups.add(results('The Wobbly Putters', 'birdie', [0, 3, 6, 10]));
-      popups.add(results('The Hole Hoppers', 'birdie', [13, 19, 23, 29]));
-    }, 6000);
-    setTimeout(() => popups.add(results('The Hole Hoppers', 'eagle', [12, 26])), 12000);
+    for (const [ms, type, count] of sequence) {
+      setTimeout(() => popups.add(results('Test 1', type, animals(count))), ms);
+    }
   };
   play();
-  setInterval(play, 20000);
+  setInterval(play, 41000);
+}
+
+// Wrapped text keeps its box at full width, leaving a gap before the QR code, so the
+// strip is sized to its longest line.
+function fitStrip() {
+  const strip = document.querySelector('.cta-text');
+  strip.style.width = '';
+  const range = document.createRange();
+  range.selectNodeContents(strip);
+  const longest = Math.max(...[...range.getClientRects()].map((line) => line.width));
+  const style = getComputedStyle(strip);
+  strip.style.width = `${Math.ceil(longest + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)) + 1}px`;
 }
 
 function drawQr(container, url) {
   const qr = qrcode(0, 'M');
   qr.addData(url);
   qr.make();
-  // Set on the page root: the white corner's padding (the quiet zone) is sized from it.
   document.documentElement.style.setProperty('--qr-modules', qr.getModuleCount());
-  // No built-in margin: the white corner's padding is the quiet zone.
+  // No margin: the white padding around it is the scanners' quiet zone.
   container.innerHTML = qr.createSvgTag({ cellSize: 1, margin: 0, scalable: true });
 }

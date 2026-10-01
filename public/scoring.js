@@ -1,5 +1,3 @@
-// Scoring helpers shared by the phone and the display.
-
 // Ranked by over/under par. Ties share a rank.
 export function standings(game) {
   const parSoFar = sum(game.submittedHoles.map((h) => game.pars[h]));
@@ -17,20 +15,18 @@ export function formatToPar(n) {
   return n > 0 ? `+${n}` : `−${-n}`;
 }
 
-// CSS class for an over/under-par number: 'under', 'over' or 'even'.
 export const toParClass = (n) => (n < 0 ? 'under' : n > 0 ? 'over' : 'even');
 
 export const sum = (list) => list.reduce((a, b) => a + (b ?? 0), 0);
 
-// Animal pictures are /animals/0.png to 29.png (Kenney's Animal Pack, CC0), in this order.
+// In the same order as /animals/0.png to 29.png.
 const ANIMALS = [
   'Bear', 'Buffalo', 'Chick', 'Chicken', 'Cow', 'Crocodile', 'Dog', 'Duck', 'Elephant', 'Frog',
   'Giraffe', 'Goat', 'Gorilla', 'Hippo', 'Horse', 'Monkey', 'Moose', 'Narwhal', 'Owl', 'Panda',
   'Parrot', 'Penguin', 'Pig', 'Rabbit', 'Rhino', 'Sloth', 'Snake', 'Walrus', 'Whale', 'Zebra',
 ];
 
-// An <img> for a player's animal. Players from before animals existed have none, so they
-// get an empty space the same size, which keeps names lined up.
+// Players from before animals existed get an empty space, which keeps names lined up.
 export function animalImg(animal) {
   return ANIMALS[animal]
     ? `<img class="animal" src="/animals/${animal}.png" alt="${ANIMALS[animal]}">`

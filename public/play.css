@@ -1,5 +1,3 @@
-/* Greyscale on purpose (a blank canvas to style later). The only colours are the
-   over/under-par scores, error messages and the gold/silver/bronze places. */
 :root {
   --bg: #141414;
   --panel: #262626;
@@ -81,13 +79,11 @@ button:disabled { opacity: 0.35; cursor: default; }
 .hole-head h1 { margin: 0; font-size: 1.45rem; }
 .hole-head .sub { margin: 0; }
 
-/* "Welcome back": the game this phone was playing. */
 .resume { padding: 14px 16px; background: var(--panel); border-radius: 14px; }
 .resume p { margin: 0 0 4px; }
 .resume .sub { margin: 0; }
 .resume-party { font-size: 1.15rem; font-weight: 700; }
 
-/* Back on the left, the main button (Send / Next / Update / Hole 4 ›) on the right. */
 .actions {
   display: grid;
   grid-template-columns: 1fr 2fr;
@@ -116,7 +112,6 @@ button:disabled { opacity: 0.35; cursor: default; }
 .row .name { font-size: 1.15rem; font-weight: 600; overflow-wrap: anywhere; }
 .party { margin: 2px 0 0; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
 
-/* Each player's animal, sitting just before their name. */
 .animal {
   display: inline-block;
   width: 1.7em;
@@ -126,7 +121,6 @@ button:disabled { opacity: 0.35; cursor: default; }
   object-fit: contain;
 }
 
-/* Standings: each player is a bar, like on the big screen. */
 .standings { width: 100%; border-collapse: separate; border-spacing: 0 6px; }
 .standings th { font-size: 0.8rem; font-weight: 400; color: var(--muted); text-align: right; padding: 0 12px 0 0; }
 .standings td { padding: 12px 12px 12px 0; text-align: right; background: var(--panel); font-variant-numeric: tabular-nums; }
@@ -138,10 +132,8 @@ button:disabled { opacity: 0.35; cursor: default; }
 .standings .total { font-weight: 700; }
 .standings .under { color: var(--under); }
 .standings .over { color: var(--over); }
-/* Level par shows "0" in a mid grey (dark on the medal bars). */
 .standings .even { color: #6e6e6e; }
 
-/* 1st, 2nd and 3rd: the whole bar takes the medal colour. */
 .standings .place-1 td { background: var(--gold); }
 .standings .place-2 td { background: var(--silver); }
 .standings .place-3 td { background: var(--bronze); }

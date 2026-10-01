@@ -1,5 +1,3 @@
-/* Greyscale on purpose (a blank canvas to style later). The only colours are the
-   over/under-par scores, the gold/silver/bronze places and the red LIVE tabs. */
 :root {
   --bg: #141414;
   --panel: #363636;
@@ -12,20 +10,19 @@
   --gold: #f2c230;
   --silver: #c7ccd4;
   --bronze: #cd8a4f;
-  --live: #e5484d;     /* the blinking LIVE tab */
-  --on-medal: #1a1a1a;       /* text on the gold/silver/bronze bars */
-  --under-on-medal: #0b6b32; /* darker green/red so they stay readable on the bars */
+  --live: #e5484d;
+  --on-medal: #1a1a1a;
+  --under-on-medal: #0b6b32; /* darker green/red, readable on the medal bars */
   --over-on-medal: #a3201a;
-  --qr-size: 34vmin;   /* the white square around the QR code */
-  --qr-modules: 25;    /* set by display.js to the real QR size */
-  /* The gap between the QR code and the edge of the white: exactly 4 QR squares, the
-     "quiet zone" scanners need. The text in the strip uses the same gap. */
+  --qr-size: 34vmin;
+  --qr-modules: 25; /* set by display.js */
+  /* 4 QR squares: the quiet zone scanners need. The strip's text uses it too. */
   --gap: calc(var(--qr-size) * 4 / (var(--qr-modules) + 8));
-  --corner: calc(var(--qr-size) * 0.12); /* rounding on the white's top-left corners */
-  --fillet: 4vmin;     /* the inward curve where the strip meets the QR corner */
+  --corner: calc(var(--qr-size) * 0.12);
+  --fillet: 4vmin;
   --cta-font: 3.7vmin;
-  --cta-pad-y: calc(var(--gap) * 0.5); /* less than --gap so the text fills the strip */
-  --strip-lines: 1;    /* the strip's text wraps onto 2 lines in portrait */
+  --cta-pad-y: calc(var(--gap) * 0.5);
+  --strip-lines: 1;
   --strip-height: calc(2 * var(--cta-pad-y) + var(--cta-font) * 1.15 * var(--strip-lines));
   color-scheme: dark;
 }
@@ -34,9 +31,7 @@
 
 html, body { height: 100%; margin: 0; }
 
-/* Landscape: player lines on the left, the QR corner below-right of them. The white
-   strip and QR corner are fixed to the screen edges, so the padding keeps the lines
-   clear of the strip. */
+/* The strip and QR corner are fixed to the edges; the bottom padding keeps the lines clear. */
 body {
   display: grid;
   grid-template-areas:
@@ -54,7 +49,6 @@ body {
   font-size: 3vmin;
 }
 
-/* Portrait: player lines use the full width and stop above the QR corner. */
 @media (orientation: portrait) {
   :root { --strip-lines: 2; }
   body {
@@ -79,8 +73,7 @@ body {
 
 /* ---- Player lines ---- */
 
-/* Lines grow with the screen only up to a readable size, so a bigger screen fits more
-   rounds rather than the same rounds bigger. Everything in a line is sized from this. */
+/* Capped so a bigger screen fits more rounds, not the same rounds bigger. */
 :root { --line-font: clamp(20px, 3vmin, 32px); }
 
 .board {
@@ -95,7 +88,6 @@ body {
   list-style: none;
 }
 
-/* The column labels share the bars' grid so they line up. */
 .row, .labels {
   flex: none; /* never squash bars to fit; display.js drops the ones that don't */
   display: grid;
@@ -114,9 +106,6 @@ body {
   overflow: hidden; /* clips the tab to the bar's rounded corners */
 }
 
-/* Every bar has a darker tab down its left edge showing its place. On players still
-   playing, a red LIVE panel (reading L-I-V-E top to bottom) fades in over the place
-   number and back out again, so the number shows through in between. */
 :is(.row, .labels) { padding-left: calc(0.55em + 1.25em); }
 .tab {
   position: absolute;
@@ -128,7 +117,6 @@ body {
   place-items: center;
   background: rgb(0 0 0 / 0.35);
 }
-/* The number is the bar's own colour, standing out against the darker tab. */
 .tab .position { font-size: 0.8em; font-weight: 800; color: var(--panel); }
 .row.place-1 .tab .position { color: var(--gold); }
 .row.place-2 .tab .position { color: var(--silver); }
@@ -145,7 +133,6 @@ body {
   text-align: center;
   color: #fff;
   background: var(--live);
-  /* Fades out over 1s, back in over 1s, and repeats. */
   animation: live-flash 1s ease-in-out infinite alternate;
 }
 @keyframes live-flash {
@@ -157,7 +144,6 @@ body {
 
 .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Small labels above the columns. */
 .labels { padding-block: 0; }
 .labels span {
   font-size: 0.5em;
@@ -168,14 +154,12 @@ body {
   color: var(--muted);
 }
 
-/* Holes played, then over/under par so far: green under, red over, grey level. */
 .row .holes { text-align: right; }
 .row .score { font-size: 1.15em; font-weight: 800; text-align: right; }
 .row .score.under { color: var(--under); }
 .row .score.over { color: var(--over); }
 .row .score.even { color: #6e6e6e; }
 
-/* The podium (1st to 3rd, finished rounds only): the whole bar takes the medal colour. */
 .row.place-1 { background: var(--gold); }
 .row.place-2 { background: var(--silver); }
 .row.place-3 { background: var(--bronze); }
@@ -184,7 +168,6 @@ body {
 .row:is(.place-1, .place-2, .place-3) .score.under { color: var(--under-on-medal); }
 .row:is(.place-1, .place-2, .place-3) .score.over { color: var(--over-on-medal); }
 
-/* Space between the podium and everyone else. */
 .podium-gap { flex: none; height: calc(var(--line-font) * 0.6); }
 
 .empty {
@@ -197,8 +180,6 @@ body {
 
 /* ---- White strip + QR corner ---- */
 
-/* The strip and the QR corner sit side by side in the bottom-right, flush with the
-   screen edges. Both use the same gap between their content and the edge of the white. */
 .cta {
   position: fixed;
   right: 0;
@@ -207,7 +188,6 @@ body {
   align-items: flex-end;
 }
 
-/* Only as wide as the text, with its top-left corner rounded where the text begins. */
 .cta-text {
   position: relative;
   max-width: calc(100vw - var(--qr-size) - 4vmin); /* wraps rather than running off-screen */
@@ -222,8 +202,7 @@ body {
   border-top-left-radius: var(--corner);
 }
 
-/* The inward curve joining the top of the strip to the QR corner's left side: a small
-   square that's white everywhere except a quarter circle cut out of its top-left. */
+/* Inward curve where the strip meets the QR corner: white with a quarter circle cut out. */
 .cta-text::after {
   content: '';
   position: absolute;
@@ -234,9 +213,7 @@ body {
   background: radial-gradient(circle at 0 0, transparent calc(var(--fillet) - 0.5px), #fff var(--fillet));
 }
 
-/* The QR code sits the same distance from the bottom as from the right. The rounded
-   corner only cuts into the gap, never the code: at 12% radius the curve reaches ~4%
-   in, and the gap is ~10%. */
+/* At 12% radius the rounded corner only cuts into the gap, never the code. */
 .qr-corner {
   flex: none;
   width: var(--qr-size);
@@ -247,10 +224,14 @@ body {
 }
 .qr-corner svg { display: block; width: 100%; height: 100%; }
 
+/* ---- Flag and ball (hole in one) ---- */
+
+.flag-layer { position: fixed; inset: 0; z-index: 9; overflow: hidden; pointer-events: none; }
+.flag-layer > * { position: absolute; }
+.ball-y, .ball { display: block; width: 100%; height: 100%; }
+
 /* ---- Pop-ups (Tony Hawk style) ---- */
 
-/* A compact card at the top middle of the screen, over the board without hiding it. The
-   type of score in big tilted letters, then an animal for each player who got it. */
 .popups {
   position: fixed;
   top: 2vmin;
@@ -269,9 +250,6 @@ body {
   gap: 0.6vmin;
   max-width: 60vw;
   padding: 1.2vmin 3vmin 1.6vmin;
-  background: rgb(0 0 0 / 0.78);
-  border-radius: 2vmin;
-  box-shadow: 0 1vmin 3vmin rgb(0 0 0 / 0.5);
   transform: rotate(-3deg);
   font-style: italic;
   font-weight: 900;
@@ -281,10 +259,9 @@ body {
 }
 .popup.leaving { animation: popup-leave 0.4s ease-in forwards; }
 
-.popup-party { margin: 0; font-size: 1.8vmin; letter-spacing: 0.08em; color: #fff; }
+.popup-party { margin: 0; font-size: 1.8vmin; letter-spacing: 0.08em; color: #fff; text-shadow: 0 0.3vmin 0 #000, 0 0 1vmin #000; }
 .popup-label { margin: 0; font-size: 5vmin; line-height: 1.05; color: #ffd23f; }
 .popup.bailed .popup-label { color: #ff4d4d; }
-/* Chunky black outline on the words, like the game. */
 .popup-label, .popup-combo {
   -webkit-text-stroke: 0.08em #000;
   paint-order: stroke fill;
@@ -292,15 +269,14 @@ body {
 }
 
 .popup-animals { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.8vmin; }
-/* Each animal is visible from its very first frame (in time with its sound) and pops
-   from big down to size, rather than fading in. */
+/* Visible from its first frame so it lands with its sound; pops down rather than fading in. */
 .popup-animals .animal {
   width: 6vmin;
   height: 6vmin;
   object-fit: contain;
   animation: animal-pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1) both;
 }
-.popup-more { font-size: 3vmin; color: #fff; }
+.popup-more { font-size: 3vmin; color: #fff; animation: animal-pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
 .popup-combo {
   margin: 0;
   font-size: 2.8vmin;
@@ -324,12 +300,9 @@ body {
   to { opacity: 0; transform: rotate(-3deg) translateY(-3vmin) scale(0.9); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .popup, .popup.leaving, .popup-animals .animal, .popup-combo { animation: none; }
+  .popup, .popup.leaving, .popup-animals .animal, .popup-more, .popup-combo { animation: none; }
 }
 
-/* Flying pop-ups (eagles): the artwork flies along its path (moved by popups.js) while the
-   label, animals and party name stay still in the middle underneath, appearing as it
-   arrives and fading as it leaves. */
 .flight {
   display: grid;
   justify-items: center;
@@ -344,7 +317,6 @@ body {
 .flight-info.shown { opacity: 1; animation: popup-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
 .flight-info.leaving { animation: flight-info-fade 0.4s ease-in forwards; }
 @keyframes flight-info-fade { to { opacity: 0; } }
-.flight .popup-party { color: #fff; text-shadow: 0 0.3vmin 0 #000, 0 0 1vmin #000; }
 
 /* ---- Sound ---- */
 
