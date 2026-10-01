@@ -28,7 +28,6 @@ For playing on real phones, setting up your course, deploying and the project la
 - A cartoony grass background with see-through bars
 - A cinematic hole-in-one pop-up style for quieter venues, picked in settings
 - Records for the week, month, year and all time on the big screen
-- A settings page and admin login for managing the course
 
 ## Credits
 

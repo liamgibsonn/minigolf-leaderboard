@@ -116,6 +116,10 @@ The screens go in this order: (welcome back →) setup → hole → totals → h
 - **Welcome back:** the phone remembers its current game in the browser only. If the QR code is scanned again within `RESUME_WINDOW` (12 hours) of the game starting and it's still going, the phone offers to continue it.
 - On a hole that's already been sent, "Next" moves on without sending. It turns into "Update" once a score changes.
 
+## Settings page (`public/admin.js`)
+
+`/admin` edits the course-wide settings: the pars (their count is the number of holes), `maxStrokes`, and `popups`. Saving needs the admin password (`ADMIN_PASSWORD`, see SELF_HOST.md). Adding holes copies the last hole's par into the new ones.
+
 ## Backend (`src/course.js`)
 
 One Durable Object instance ("main") holds every game, player and score in SQLite.
@@ -128,6 +132,9 @@ One Durable Object instance ("main") holds every game, player and score in SQLit
 | `STROKE_LIMIT` | The highest `course.json` can set `maxStrokes` to. |
 | `BOARD_LIMIT` | The most rounds sent to the big screen, which shows as many as fit. |
 | `LIVE_WINDOW` | A game with nothing sent for 30 minutes drops off the big screen. Its data is kept, so it comes back if they carry on. |
+| `DEFAULT_SETTINGS` | Used until settings are first saved from `/admin`: `course.json`'s pars and maxStrokes, with pop-ups on. |
+
+Saved settings live in the `settings` table, in the row named `admin`, as JSON: `{ pars, maxStrokes, popups }`. Older databases also have a stale `course` row there, which is ignored.
 
 ### API (all JSON, under `/api`)
 
@@ -142,10 +149,13 @@ One Durable Object instance ("main") holds every game, player and score in SQLit
 | `GET /ws?game=:id` | WebSocket for one game (phones) |
 | `GET /board` | `{ layout, today, liveGames, leaderboard }`: what the big screen shows |
 | `GET /stats?layout=3-3-3&limit=5` | `{ layout, periods }`: records and averages |
+| `GET /settings` | `{ pars, maxStrokes, popups, limits }`: no password needed |
+| `POST /settings` `{ password, pars, maxStrokes, popups }` | The saved settings. 401 for a wrong password, 503 if `ADMIN_PASSWORD` isn't set |
 
 ### Rules
 
-- **Course:** each game copies `course.json` when it's created, so editing it never affects a game already underway.
+- **Course:** each game copies the current settings' pars and maxStrokes when it's created, so changing them never affects a game already underway. The big screen shows the current layout's records, so games still on an old layout drop off it.
+- **Pop-ups off:** the `events` message isn't sent to the big screen at all. Phones are unaffected.
 - **Starting:** names with swearing are refused. The check also runs with spaces, dots and dashes removed, which catches "f u c k" and occasionally an innocent name. A blank party name gets a random one like "The Wobbly Putters". Each player gets a different random animal, a number from 0 to 29 matching `public/animals/<number>.png`.
 - **Pop-up events:** each score is checked in this order. A hole in one (1 stroke) wins over everything, then eagle (2+ under par), then birdie (1 under), then bailed (hit `maxStrokes`). Events only fire the first time a hole is sent. Correcting it later updates quietly, and resending identical scores does nothing.
 - **Records:** only games finished with every hole sent count. Each player's round goes into `rounds`, which every record and average reads from. Records are kept per course layout (the pars joined, e.g. `3-3-3`), for today, this week (from Monday), this month, this year and all time. All periods start at 00:00 UTC.
@@ -154,4 +164,4 @@ One Durable Object instance ("main") holds every game, player and score in SQLit
 ### Live messages
 
 - **Phones** get `{ type: 'game', game, submitted }` whenever their game changes. `submitted` is `{ hole, partyName, events }` after a hole is sent, otherwise null.
-- **The big screen** gets `{ type: 'board', board }` on connect and after every start, hole and finish. It gets `{ type: 'events', gameId, hole, partyName, events }` when a hole in any game earns pop-ups.
+- **The big screen** gets `{ type: 'board', board }` on connect and after every start, hole and finish. It gets `{ type: 'events', gameId, hole, partyName, events }` when a hole in any game earns pop-ups (unless pop-ups are off), and a fresh board whenever settings are saved.

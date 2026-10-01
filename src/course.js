@@ -7,12 +7,14 @@ const MAX_HOLES = 18;
 const MAX_PLAYERS = 8;
 const MAX_NAME_LENGTH = 20;
 const MAX_PARTY_NAME_LENGTH = 30;
-const STROKE_LIMIT = 20; // the highest course.json can set maxStrokes to
+const STROKE_LIMIT = 20; // the highest maxStrokes can be set to
 const BOARD_LIMIT = 50; // most rounds sent to the display; it shows as many as fit
 // A game with nothing sent for this long drops off the big screen (its data is kept).
 const LIVE_WINDOW = 30 * 60 * 1000;
 
-const COURSE = checkCourse(courseJson);
+const problem = courseProblem(courseJson);
+if (problem) throw new Error(`course.json: ${problem}`);
+const DEFAULT_SETTINGS = { pars: courseJson.pars, maxStrokes: courseJson.maxStrokes, popups: true };
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -69,6 +71,10 @@ export class Course extends DurableObject {
         animal      INTEGER,
         party_name  TEXT
       );
+      CREATE TABLE IF NOT EXISTS settings (
+        name  TEXT PRIMARY KEY,
+        value TEXT
+      );
       CREATE INDEX IF NOT EXISTS players_by_game ON players (game_id);
       CREATE INDEX IF NOT EXISTS scores_by_game ON scores (game_id);
       CREATE INDEX IF NOT EXISTS rounds_by_layout_time ON rounds (layout, finished_at);
@@ -104,6 +110,14 @@ export class Course extends DurableObject {
     const body = await readJson(request);
 
     if (resource === 'ws') return this.connect(request, url.searchParams.get('game'));
+    if (resource === 'settings') {
+      if (request.method === 'GET') return Response.json(this.publicSettings());
+      if (request.method !== 'POST') throw new HttpError(405, 'Method not allowed');
+      await this.checkPassword(body?.password);
+      this.saveSettings(body);
+      this.sendToDisplays({ type: 'board', board: this.board() });
+      return Response.json(this.publicSettings());
+    }
     if (resource === 'stats' || resource === 'board') {
       if (request.method !== 'GET') throw new HttpError(405, 'Method not allowed');
       return Response.json(resource === 'board' ? this.board() : this.stats(url.searchParams));
@@ -142,7 +156,7 @@ export class Course extends DurableObject {
     }
     const updated = this.broadcast(id, submitted);
 
-    if (submitted?.events.length) this.sendToDisplays({ type: 'events', gameId: id, ...submitted });
+    if (submitted?.events.length && this.settings().popups) this.sendToDisplays({ type: 'events', gameId: id, ...submitted });
     this.sendToDisplays({ type: 'board', board: this.board() });
     return Response.json({ game: updated, submitted });
   }
@@ -152,7 +166,7 @@ export class Course extends DurableObject {
   createGame() {
     const id = randomId(6);
     const key = randomId(20);
-    const { pars, maxStrokes } = COURSE;
+    const { pars, maxStrokes } = this.settings();
     this.sql.exec(
       'INSERT INTO games (id, edit_key, pars, max_strokes, created_at) VALUES (?, ?, ?, ?, ?)',
       id, key, JSON.stringify(pars), maxStrokes, Date.now(),
@@ -304,7 +318,7 @@ export class Course extends DurableObject {
   // For the current course unless ?layout= says otherwise.
   stats(params) {
     const layoutParam = params.get('layout');
-    const pars = layoutParam ? parseLayoutKey(layoutParam) : COURSE.pars;
+    const pars = layoutParam ? parseLayoutKey(layoutParam) : this.settings().pars;
     if (!pars) throw new HttpError(400, 'layout should look like 3-3-3');
     const layout = layoutKey(pars);
     const limit = Math.min(Math.max(Number.parseInt(params.get('limit') ?? '5', 10) || 5, 1), 50);
@@ -340,6 +354,37 @@ export class Course extends DurableObject {
       periods[period] = { since, rounds, average: roundTo1(average), best, holeAverages, holesInOne };
     }
     return { layout: pars, periods };
+  }
+
+  // ---- Settings ------------------------------------------------------------
+
+  settings() {
+    // Not 'course': older databases have a stale row by that name.
+    const row = this.sql.exec("SELECT value FROM settings WHERE name = 'admin'").toArray()[0];
+    return row ? JSON.parse(row.value) : DEFAULT_SETTINGS;
+  }
+
+  publicSettings() {
+    return { ...this.settings(), limits: { maxHoles: MAX_HOLES, strokeLimit: STROKE_LIMIT } };
+  }
+
+  saveSettings({ pars, maxStrokes, popups }) {
+    const problem = courseProblem({ pars, maxStrokes });
+    if (problem) throw new HttpError(400, problem.charAt(0).toUpperCase() + problem.slice(1));
+    if (typeof popups !== 'boolean') throw new HttpError(400, 'Pop-ups must be on or off');
+    this.sql.exec(
+      "INSERT OR REPLACE INTO settings (name, value) VALUES ('admin', ?)",
+      JSON.stringify({ pars, maxStrokes, popups }),
+    );
+  }
+
+  async checkPassword(password) {
+    const expected = this.env.ADMIN_PASSWORD;
+    if (!expected) throw new HttpError(503, 'No admin password is set up on the server');
+    // Hashed so both sides are the same length, which timingSafeEqual needs.
+    const hash = async (text) => crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(text ?? '')));
+    const [given, wanted] = await Promise.all([hash(password), hash(expected)]);
+    if (!crypto.subtle.timingSafeEqual(given, wanted)) throw new HttpError(401, 'Wrong password');
   }
 
   // ---- Live updates --------------------------------------------------------
@@ -421,17 +466,16 @@ export class Course extends DurableObject {
   }
 }
 
-// Stops the server starting (with a clear message in the terminal) if course.json is wrong.
-function checkCourse({ pars, maxStrokes }) {
+function courseProblem({ pars, maxStrokes }) {
   if (!Number.isInteger(maxStrokes) || maxStrokes < 1 || maxStrokes > STROKE_LIMIT) {
-    throw new Error(`course.json: maxStrokes must be a whole number from 1 to ${STROKE_LIMIT}`);
+    return `max strokes must be a whole number from 1 to ${STROKE_LIMIT}`;
   }
   if (!Array.isArray(pars) || pars.length < 1 || pars.length > MAX_HOLES) {
-    throw new Error(`course.json: pars must list between 1 and ${MAX_HOLES} holes`);
+    return `the course must have between 1 and ${MAX_HOLES} holes`;
   }
   const bad = pars.findIndex((par) => !Number.isInteger(par) || par < 1 || par > maxStrokes);
-  if (bad !== -1) throw new Error(`course.json: hole ${bad + 1}'s par must be a whole number from 1 to ${maxStrokes}`);
-  return { pars, maxStrokes };
+  if (bad !== -1) return `hole ${bad + 1}'s par must be a whole number from 1 to ${maxStrokes}`;
+  return null;
 }
 
 function scoreEvent(strokes, par, maxStrokes) {

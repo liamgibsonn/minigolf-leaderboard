@@ -30,7 +30,18 @@ Open the big screen at `http://<your computer's IP>:8787` rather than `localhost
 
 ## Setting up the course
 
-The course is set in [`course.json`](course.json):
+Open `/admin` (e.g. http://localhost:8787/admin) to set the number of holes, each hole's par, the most strokes on a hole, and whether the big screen shows pop-ups. Saved settings are kept in the database, so they last through restarts and apply to every screen and phone straight away.
+
+The page asks for an admin password, which the server reads from `ADMIN_PASSWORD`. Without one, nothing can be saved.
+
+- **Locally:** create a file called `.dev.vars` in the project folder (git ignores it) containing `ADMIN_PASSWORD=your-password`, then restart the server.
+- **On Cloudflare:** run `npx wrangler secret put ADMIN_PASSWORD`, or add it under the Worker's **Settings → Variables and Secrets** as a secret.
+
+Games already in progress keep the course they started with. Changing the pars starts a fresh set of records, and the old layout's records are kept.
+
+### Starting defaults
+
+Until settings are first saved from `/admin`, the course comes from [`course.json`](course.json):
 
 ```json
 {
@@ -42,7 +53,7 @@ The course is set in [`course.json`](course.json):
 - `pars` is the par for each hole, in order. The number of entries is the number of holes (up to 18).
 - `maxStrokes` is the most strokes a player can take on one hole (up to 20).
 
-Restart the server after editing it. Games already in progress keep the course they started with. Changing the pars starts a fresh set of records, and the old layout's records are kept.
+Once settings have been saved from `/admin`, `course.json` is no longer used.
 
 ## Pop-ups and sounds
 
@@ -89,8 +100,9 @@ For how each part works and what the settings mean, see [CODE_GUIDE.md](CODE_GUI
 | `public/animals/` | Animal pictures `0.png` to `29.png` |
 | `public/index.html`, `display.*` | The big screen |
 | `public/play.*` | The phone scorecard |
+| `public/admin.*` | The settings page at `/admin` |
 | `public/scoring.js` | Rankings and score formatting shared by both pages |
 | `public/popups.js`, `sounds.js` | Pop-ups on the big screen and their sound effects |
 | `public/eagle.svg` | Placeholder cartoon eagle that flies across the screen for eagle pop-ups; swap for your own animation |
 | `public/vendor/qrcode.mjs` | QR code generator ([qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator)); refresh it with `npm run vendor` |
-| `course.json` | The course's pars and maximum strokes |
+| `course.json` | The course's starting pars and maximum strokes, until settings are saved from `/admin` |
